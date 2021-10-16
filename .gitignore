@@ -425,3 +425,6 @@ lib/
 
 # bin folder
 bin/
+
+# out folder
+out/
