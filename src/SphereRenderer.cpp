@@ -655,6 +655,8 @@ void SphereRenderer::display()
 		reloadShaders();
 	}
 
+
+	// Read buffer from fluidsim
 	// Vertex binding setup
 	auto vertexBinding = m_vao->binding(0);
 	vertexBinding->setAttribute(0);
