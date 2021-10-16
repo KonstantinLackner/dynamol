@@ -422,3 +422,6 @@ FodyWeavers.xsd
 
 # lib folder
 lib/
+
+# bin folder
+bin/
