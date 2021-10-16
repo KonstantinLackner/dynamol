@@ -1,0 +1,17 @@
+# ninja log v5
+18	350	6560880478904464	src/CMakeFiles/dynamol.dir/fluidsim/Simulation.cpp.obj	bb835b77c2fa2b5e
+4	384	6560880479112703	src/CMakeFiles/dynamol.dir/Interactor.cpp.obj	493a90bb1d1074ee
+24	444	6560880479795108	src/CMakeFiles/dynamol.dir/__/lib/imgui/imgui_demo.cpp.obj	52a9a83bffad1476
+28	469	6560880480012642	src/CMakeFiles/dynamol.dir/__/lib/imgui/imgui_widgets.cpp.obj	f1a87b1daf9aa2ef
+385	587	6560880481246985	src/CMakeFiles/dynamol.dir/__/lib/stb/stb_vorbis.c.obj	dd978db684f26032
+12	663	6560880482045463	src/CMakeFiles/dynamol.dir/fluidsim/ImpulseState.cpp.obj	5b912854828ff0b
+352	765	6560880482960276	src/CMakeFiles/dynamol.dir/__/lib/imgui/imgui_draw.cpp.obj	bfc7ad31f2d6ccc5
+26	774	6560880483132579	src/CMakeFiles/dynamol.dir/__/lib/tinyfd/tinyfiledialogs.c.obj	f2516794c4d62a8a
+23	783	6560880483221097	src/CMakeFiles/dynamol.dir/__/lib/imgui/imgui.cpp.obj	8785e6b59787ca16
+9	983	6560880485235801	src/CMakeFiles/dynamol.dir/Scene.cpp.obj	f0fc5991bcb017d0
+5	1440	6560880489777233	src/CMakeFiles/dynamol.dir/Protein.cpp.obj	9c4ac8278afd1667
+3	1498	6560880490380059	src/CMakeFiles/dynamol.dir/CameraInteractor.cpp.obj	7f429cf5062f26c2
+1	1599	6560880491390249	src/CMakeFiles/dynamol.dir/BoundingBoxRenderer.cpp.obj	607384774be39f1d
+7	1674	6560880492132484	src/CMakeFiles/dynamol.dir/Renderer.cpp.obj	2f81b51f4df31ee2
+21	1881	6560880494143767	src/CMakeFiles/dynamol.dir/main.cpp.obj	d37bb0335ffc33f6
+14	2104	6560880496414576	src/CMakeFiles/dynamol.dir/SphereRenderer.cpp.obj	1efa849a96621b4
