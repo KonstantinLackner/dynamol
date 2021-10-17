@@ -1,29 +1,41 @@
 #include "FluidSim.h"
 
-FluidSim::FluidSim(Renderer *const renderer, const std::array<std::int32_t, 3> &windowDimensions, const std::array<std::int32_t, 3> &cubeDimensions)
-	: m_renderer{renderer},
-	  m_windowDimensions{windowDimensions},
-	  m_cubeDimensions{cubeDimensions}
+using namespace gl;
+
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
+
+#include <filesystem>
+#include <stdexcept>
+
+namespace dynamol
 {
-	// shader loading here
+
+FluidSim::FluidSim(Renderer *const renderer, const std::array<std::int32_t, 2> &windowDimensions, const std::array<std::int32_t, 3> &cubeDimensions)
+	: m_renderer{renderer},
+      m_timerQuery{std::make_unique<globjects::Query>()},
+	  m_windowDimensions{windowDimensions},
+	  m_cubeDimensions{cubeDimensions},
+      m_velocityTexture{cubeDimensions[0], cubeDimensions[1], cubeDimensions[2], 4, true},
+      m_pressureTexture{cubeDimensions[0], cubeDimensions[1], cubeDimensions[2], 4, true},
+      m_divergenceTexture{cubeDimensions[0], cubeDimensions[1], cubeDimensions[2], 1, true},
+	  m_temporaryTexture{cubeDimensions[0], cubeDimensions[1], cubeDimensions[2], 4, true},
+      m_debugFramebuffer{windowDimensions[0], windowDimensions[1]},
+      m_gridScale{1.0f / cubeDimensions[0]},
+      m_splatRadius{cubeDimensions[0] * 0.37f},
+      m_dt{0},
+      m_lastTime{0},
+      m_frameCounter{0},
+      m_frameTimeSum{0}
+{
+    LoadShaders();
+    m_debugFramebuffer.Bind();
+    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+    m_debugFramebuffer.Unbind();
 }
 
 FluidSim::~FluidSim()
 {
-    glDeleteQueries(1, &timerQuery);
-}
-
-void FluidSim::Run()
-{
-    while (!glfwWindowShouldClose(window))
-    {
-        double now = glfwGetTime();
-        dt = lastTime == 0 ? 0.016667 : now - lastTime;
-        lastTime = now;
-
-        glfwPollEvents();
-        Execute();
-    }
 }
 
 namespace Variables
@@ -38,235 +50,187 @@ namespace Variables
 
 void FluidSim::Execute()
 {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    const double now{glfwGetTime()};
+    m_dt = m_lastTime == 0 ? 0.016667 : now - m_lastTime;
+    m_lastTime = now;
     DoDroplets();
 
     using namespace Variables;
 
-    glBeginQuery(GL_TIME_ELAPSED, timerQuery);
+    m_timerQuery->begin(GL_TIME_ELAPSED);
 
 #pragma region Advection
-    advectionShaderProgram.Select();
-    advectionShaderProgram.SetUniform("delta_t", dt);
-    advectionShaderProgram.SetUniform("dissipation", Dissipation);
-    advectionShaderProgram.SetUniform("gs", gridScale);
-    advectionShaderProgram.SetUniform("gravity", Gravity);
-    BindImage("quantity_r", velocityTexture.GetFront(), 0, GL_READ_ONLY);
-    BindImage("quantity_w", velocityTexture.GetBack(), 0, GL_WRITE_ONLY);
-    BindImage("velocity", velocityTexture.GetFront(), 0, GL_READ_ONLY);
-    Compute();
-    velocityTexture.SwapBuffers();
+    m_advectionProgram->setUniform("delta_t", m_dt);
+    m_advectionProgram->setUniform("dissipation", Dissipation);
+    m_advectionProgram->setUniform("gs", m_gridScale);
+    m_advectionProgram->setUniform("gravity", Gravity);
+    BindImage(m_advectionProgram, "quantity_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
+    BindImage(m_advectionProgram, "quantity_w", m_velocityTexture.GetBack(), 0, GL_WRITE_ONLY);
+    BindImage(m_advectionProgram, "velocity", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
+    Compute(m_advectionProgram);
+    m_velocityTexture.SwapBuffers();
 #pragma endregion
 
 #pragma region Impulse
-    if (impulseState.ForceActive)
+    if (m_impulseState.ForceActive)
     {
-        addImpulseShaderProgram.Select();
-        addImpulseShaderProgram.SetUniform("position", impulseState.CurrentPos);
-        addImpulseShaderProgram.SetUniform("radius", splatRadius);
-        addImpulseShaderProgram.SetUniform("force", glm::vec4{ impulseState.Delta, 0 });
-        BindImage("field_r", velocityTexture.GetFront(), 0, GL_READ_ONLY);
-        BindImage("field_w", velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
-        Compute();
-        velocityTexture.SwapBuffers();
-        impulseState.ForceActive = false;
+        m_addImpulseProgram->setUniform("position", m_impulseState.CurrentPos);
+        m_addImpulseProgram->setUniform("radius", m_splatRadius);
+        m_addImpulseProgram->setUniform("force", glm::vec4{ m_impulseState.Delta, 0 });
+        BindImage(m_addImpulseProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
+        BindImage(m_addImpulseProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
+        Compute(m_addImpulseProgram);
+        m_velocityTexture.SwapBuffers();
+        m_impulseState.ForceActive = false;
     }
 
 #pragma endregion
 
 #pragma region Diffuse
-    const float alpha{ (gridScale * gridScale) / (Viscosity * dt) };
+    const float alpha{ (m_gridScale * m_gridScale) / (Viscosity * m_dt) };
     const float beta{ alpha + 6.0f };
-    SolvePoissonSystem(velocityTexture, velocityTexture.GetFront(), alpha, beta);
+    SolvePoissonSystem(m_velocityTexture, m_velocityTexture.GetFront(), alpha, beta);
 #pragma endregion
 
 #pragma region Projection
-    divergenceShaderProgram.Select();
-    divergenceShaderProgram.SetUniform("gs", gridScale);
-    BindImage("field_r", velocityTexture.GetFront(), 0, GL_READ_ONLY);
-    BindImage("field_w", velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
-    Compute();
+    m_divergenceProgram->setUniform("gs", m_gridScale);
+    BindImage(m_divergenceProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
+    BindImage(m_divergenceProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
+    Compute(m_divergenceProgram);
 
-    SolvePoissonSystem(pressureTexture, velocityTexture.GetBack(), -1, 6.0f);
+    SolvePoissonSystem(m_pressureTexture, m_velocityTexture.GetBack(), -1, 6.0f);
 
-    gradientShaderProgram.Select();
-    gradientShaderProgram.SetUniform("gs", gridScale);
-    BindImage("field_r", pressureTexture.GetFront(), 0, GL_READ_ONLY);
-    BindImage("field_w", pressureTexture.GetBack(), 1, GL_WRITE_ONLY);
-    Compute();
+    m_gradientProgram->setUniform("gs", m_gridScale);
+    BindImage(m_gradientProgram, "field_r", m_pressureTexture.GetFront(), 0, GL_READ_ONLY);
+    BindImage(m_gradientProgram, "field_w", m_pressureTexture.GetBack(), 1, GL_WRITE_ONLY);
+    Compute(m_gradientProgram);
 
-    subtractShaderProgram.Select();
-    BindImage("a", velocityTexture.GetFront(), 0, GL_READ_ONLY);
-    BindImage("b", pressureTexture.GetFront(), 1, GL_READ_ONLY);
-    BindImage("c", velocityTexture.GetBack(), 2, GL_WRITE_ONLY);
-    Compute();
-    velocityTexture.SwapBuffers();
+    BindImage(m_subtractProgram, "a", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
+    BindImage(m_subtractProgram, "b", m_pressureTexture.GetFront(), 1, GL_READ_ONLY);
+    BindImage(m_subtractProgram, "c", m_velocityTexture.GetBack(), 2, GL_WRITE_ONLY);
+    Compute(m_subtractProgram);
+    m_velocityTexture.SwapBuffers();
 #pragma endregion
 
 #pragma region Bounds
     if (Boundaries)
     {
-        SetBounds(velocityTexture, -1);
+        SetBounds(m_velocityTexture, -1);
     }
 #pragma endregion
     // Transform feedback read
 #pragma region TimeTrack
-    glEndQuery(GL_TIME_ELAPSED);
+    m_timerQuery->end(GL_TIME_ELAPSED);
 
-    GLuint elapsedTime;
-    glGetQueryObjectuiv(timerQuery, GL_QUERY_RESULT, &elapsedTime);
+    const GLuint elapsedTime{m_timerQuery->waitAndGet(GL_QUERY_RESULT)};
 
-    frameTimeSum += elapsedTime / 1000;
+    m_frameTimeSum += elapsedTime / 1000;
 
-    if (++frameCounter == 100)
+    if (++m_frameCounter == 100)
     {
-        std::cout << frameTimeSum / static_cast<float>(frameCounter) << '\n';
-        frameCounter = 0;
-        frameTimeSum = 0;
+        globjects::debug() << m_frameTimeSum / static_cast<float>(m_frameCounter) << '\n';
+        m_frameCounter = 0;
+        m_frameTimeSum = 0;
     }
 #pragma endregion
 
-    glfwSwapBuffers(window);
+#pragma region Render
+    m_debugFramebuffer.Bind();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    m_renderPlaneProgram->use();
+    m_velocityTexture.Bind(0);
+    m_renderPlaneProgram->setUniform("sampler", 0);
+    m_renderPlaneProgram->setUniform("depth", 0.0f);
+    m_quad.Bind();
+
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    m_quad.Draw();
+    m_debugFramebuffer.Unbind();
+#pragma endregion
 }
 
-static std::string LoadShader(std::string_view name)
+GLuint FluidSim::GetDebugFramebufferTexture() const
 {
-    std::ifstream file;
-    file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    file.open(name.data());
-
-    return { std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{} };
-};
+    return m_debugFramebuffer.GetTexture().GetTexture();
+}
 
 void FluidSim::LoadShaders()
 {
-    CStdGLShader texCoordShader{ CStdShader::Type::Vertex, LoadShader("Shaders/tex_coords.vert") };
-    // Redefining old keywords
-    texCoordShader.SetMacro("varying", "out");
-    texCoordShader.SetMacro("attribute", "in");
-    texCoordShader.Compile();
+    globjects::Shader::globalReplace("layout(local_size_x=1, local_size_y=1, local_size_z=1)", "layout(local_size_x=8, local_size_y=8, local_size_z=8)");
 
-    const auto addShaderProgram = [&texCoordShader](CStdGLShaderProgram& program, std::string_view name)
+    const auto addShaderProgram = [this](globjects::Program *(FluidSim::*program), std::string_view name, std::initializer_list<std::pair<gl::GLenum, std::string>> shaders)
     {
-        CStdGLShader fragmentShader{ CStdShader::Type::Fragment, LoadShader(std::string{"Shaders/"} + name.data() + ".frag") };
-        fragmentShader.SetMacro("varying", "out");
-        fragmentShader.SetMacro("attribute", "in");
-        fragmentShader.Compile();
-
-        program.AddShader(&texCoordShader);
-        program.AddShader(&fragmentShader);
-        program.Link();
-        program.SetObjectLabel(name);
+        m_renderer->createShaderProgram(name.data(), shaders);
+        this->*program = m_renderer->shaderProgram(name.data());
     };
 
-    addShaderProgram(viewShaderProgram, "view");
+    static constexpr std::array<std::pair<globjects::Program *(FluidSim::*), std::string_view>, 9> ProgramList
+    {{
+        {&FluidSim::m_addImpulseProgram, "add_impulse"},
+        {&FluidSim::m_advectionProgram, "advection"},
+        {&FluidSim::m_jacobiProgram, "jacobi"},
+        {&FluidSim::m_divergenceProgram, "divergence"},
+        {&FluidSim::m_gradientProgram, "gradient"},
+        {&FluidSim::m_subtractProgram, "subtract"},
+        {&FluidSim::m_boundaryProgram, "boundary"},
+        {&FluidSim::m_copyProgram, "copy"},
+        {&FluidSim::m_clearProgram, "clear"}
+    }};
 
-    const auto addComputeShaderProgram = [](CStdGLShaderProgram& program, std::string_view name, std::string_view overrideImageFormat = "")
+    for (const auto &[program, name] : ProgramList)
     {
-        //static std::regex re_include{"^[ \\t]*#include[ \\t]+[<\"]([\\.\\w]+?)[>\"][ \\t]*$", regex_constants::optimize | regex_constants::ECMAScript};
-        static std::regex localSizeRegex{ "^[ \\t]*layout[ \\t]*\\([ \\t]*local_size_.*$", std::regex_constants::optimize | std::regex_constants::ECMAScript };
-        static std::regex imageFormatRegex{ "^[ \\t]*layout[ \\t]*\\([ \\t]*r[a-z0-9_]+.*$", std::regex_constants::optimize | std::regex_constants::ECMAScript };
+        addShaderProgram(program, name, {{GL_COMPUTE_SHADER, std::string{"./fluidsim/shader/"} + name.data() + ".comp"}});
+    }
 
-        std::ifstream file;
-        file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-        file.open(std::string{ "Shaders/" } + name.data() + ".comp");
-        file.exceptions(std::ifstream::badbit);
-
-        std::ostringstream processedFile;
-
-        std::string line;
-        while (std::getline(file, line))
-        {
-            std::smatch match;
-            if (std::regex_match(line, match, localSizeRegex))
-            {
-                processedFile << "layout(local_size_x=" << MainProgram::WorkGroupSize[0];
-                processedFile << ", local_size_y=" << MainProgram::WorkGroupSize[1];
-                processedFile << ", local_size_z=" << MainProgram::WorkGroupSize[2];
-                processedFile << ") in;\n";
-            }
-            else if (!overrideImageFormat.empty() && std::regex_match(line, match, imageFormatRegex))
-            {
-                processedFile << "layout(" << overrideImageFormat << ')' << '\n';
-            }
-            else
-            {
-                processedFile << line << '\n';
-            }
-        }
-
-        CStdGLShader computeShader{ CStdShader::Type::Compute, processedFile.str() };
-        computeShader.Compile();
-
-        program.AddShader(&computeShader);
-        program.Link();
-        program.SetObjectLabel(name);
-    };
-
-    addComputeShaderProgram(addImpulseShaderProgram, "add_impulse");
-    addComputeShaderProgram(advectionShaderProgram, "advection");
-    addComputeShaderProgram(jacobiShaderProgram, "jacobi");
-    addComputeShaderProgram(divergenceShaderProgram, "divergence");
-    addComputeShaderProgram(gradientShaderProgram, "gradient");
-    addComputeShaderProgram(subtractShaderProgram, "subtract");
-    addComputeShaderProgram(boundaryShaderProgram, "boundary");
-    addComputeShaderProgram(copyShaderProgram, "copy");
-    addComputeShaderProgram(clearShaderProgram, "clear");
-
-    CStdGLShader renderPlaneVertexShader{ CStdShader::Type::Vertex, LoadShader("Shaders/renderPlane.vert") };
-    renderPlaneVertexShader.Compile();
-    CStdGLShader renderPlaneFragmentShader{ CStdShader::Type::Fragment, LoadShader("Shaders/renderPlane.frag") };
-    renderPlaneFragmentShader.Compile();
-
-    renderPlaneShaderProgram.AddShader(&renderPlaneVertexShader);
-    renderPlaneShaderProgram.AddShader(&renderPlaneFragmentShader);
-    renderPlaneShaderProgram.Link();
+    addShaderProgram(&FluidSim::m_renderPlaneProgram, "renderPlane",
+    {
+        {GL_VERTEX_SHADER, "fluidsim/shader/renderPlane.vert"},
+        {GL_FRAGMENT_SHADER, "fluidsim/shader/renderPlane.frag"}
+    });
 }
 
-void FluidSim::BindImage(std::string_view name, const CStdTexture3D& texture, const int value, const GLenum access)
+void FluidSim::BindImage(globjects::Program *const program, std::string_view name, const CStdTexture3D& texture, const int value, const GLenum access)
 {
-    static_cast<CStdGLShaderProgram* const>(CStdShaderProgram::GetCurrentShaderProgram())->SetUniform(name, glUniform1i, value);
+    program->use();
+    program->setUniform(name.data(), value);
     texture.BindImage(value, access);
 }
 
-void FluidSim::Compute()
+void FluidSim::Compute(globjects::Program *const program)
 {
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     // Workgroups (2048 CUDA cores)
-    glDispatchCompute(cubeDimensions[0] / WorkGroupSize[0], cubeDimensions[1] / WorkGroupSize[1], cubeDimensions[2] / WorkGroupSize[2]);
+    program->dispatchCompute(m_cubeDimensions[0] / WorkGroupSize[0], m_cubeDimensions[1] / WorkGroupSize[1], m_cubeDimensions[2] / WorkGroupSize[2]);
 }
 
 void FluidSim::SolvePoissonSystem(CStdSwappableTexture3D& swappableTexture, const CStdTexture3D& initialValue, const float alpha, const float beta)
 {
-    CopyImage(initialValue, temporaryTexture);
-    jacobiShaderProgram.Select();
-    jacobiShaderProgram.SetUniform("alpha", alpha);
-    jacobiShaderProgram.SetUniform("beta", beta);
-    BindImage("fieldb_r", temporaryTexture, 0, GL_READ_ONLY);
+    CopyImage(initialValue, m_temporaryTexture);
+    m_jacobiProgram->setUniform("alpha", alpha);
+    m_jacobiProgram->setUniform("beta", beta);
+    BindImage(m_jacobiProgram, "fieldb_r", m_temporaryTexture, 0, GL_READ_ONLY);
 
     for (std::size_t i{ 0 }; i < Variables::NumJacobiRounds; ++i)
     {
-        BindImage("fieldx_r", swappableTexture.GetFront(), 1, GL_READ_ONLY);
-        BindImage("field_out", swappableTexture.GetBack(), 2, GL_WRITE_ONLY);
-        Compute();
+        BindImage(m_jacobiProgram, "fieldx_r", swappableTexture.GetFront(), 1, GL_READ_ONLY);
+        BindImage(m_jacobiProgram, "field_out", swappableTexture.GetBack(), 2, GL_WRITE_ONLY);
+        Compute(m_jacobiProgram);
         swappableTexture.SwapBuffers();
     }
 }
 
 void FluidSim::CopyImage(const CStdTexture3D& source, CStdTexture3D& destination)
 {
-    copyShaderProgram.Select();
-    BindImage("src", source, 0, GL_READ_ONLY);
-    BindImage("dest", destination, 1, GL_WRITE_ONLY);
-    Compute();
+    BindImage(m_copyProgram, "src", source, 0, GL_READ_ONLY);
+    BindImage(m_copyProgram, "dest", destination, 1, GL_WRITE_ONLY);
+    Compute(m_copyProgram);
 }
 
 void FluidSim::SetBounds(CStdSwappableTexture3D& texture, const float scale)
 {
-    boundaryShaderProgram.Select();
-    boundaryShaderProgram.SetUniform("scale", scale);
-    boundaryShaderProgram.SetUniform("box_size", glm::vec3{ static_cast<float>(cubeDimensions[0]), static_cast<float>(cubeDimensions[1]), static_cast<float>(cubeDimensions[2]) });
-    Compute();
+    m_boundaryProgram->setUniform("scale", scale);
+    m_boundaryProgram->setUniform("box_size", glm::vec3{ static_cast<float>(m_cubeDimensions[0]), static_cast<float>(m_cubeDimensions[1]), static_cast<float>(m_cubeDimensions[2]) });
+    Compute(m_boundaryProgram);
     texture.SwapBuffers();
 }
 
@@ -276,7 +240,7 @@ void FluidSim::DoDroplets()
     static float nextDrop{ 0.0f };
     static glm::ivec2 frequencyRange{ 200, 1000 };
 
-    acc += dt * 1000;
+    acc += m_dt * 1000;
     if (acc >= nextDrop)
     {
         acc = 0;
@@ -285,23 +249,24 @@ void FluidSim::DoDroplets()
         //LOG_INFO("Next drop: %.2f", next_drop);
 
         const glm::vec3 randomPositions[2]{ RandomPosition(), RandomPosition() };
-        impulseState.LastPos = randomPositions[0];
-        impulseState.CurrentPos = randomPositions[1];
-        //std::cout << impulseState.LastPos.x << ' ' << impulseState.LastPos.y << ' ' << impulseState.LastPos.z << '\n';
-        impulseState.Delta = impulseState.CurrentPos - impulseState.LastPos;
-        impulseState.ForceActive = true;
-        impulseState.InkActive = true;
-        impulseState.Radial = true;
+        m_impulseState.LastPos = randomPositions[0];
+        m_impulseState.CurrentPos = randomPositions[1];
+        m_impulseState.Delta = m_impulseState.CurrentPos - m_impulseState.LastPos;
+        m_impulseState.ForceActive = true;
+        m_impulseState.InkActive = true;
+        m_impulseState.Radial = true;
     }
     else
     {
-        impulseState.ForceActive = false;
-        impulseState.InkActive = false;
-        impulseState.Radial = false;
+        m_impulseState.ForceActive = false;
+        m_impulseState.InkActive = false;
+        m_impulseState.Radial = false;
     }
 }
 
 glm::vec3 FluidSim::RandomPosition() const
 {
-    return { std::rand() % cubeDimensions[0], std::rand() % cubeDimensions[1], std::rand() % cubeDimensions[2] };
+    return { std::rand() % m_cubeDimensions[0], std::rand() % m_cubeDimensions[1], std::rand() % m_cubeDimensions[2] };
+}
+
 }

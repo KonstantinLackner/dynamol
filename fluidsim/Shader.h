@@ -1,13 +1,18 @@
 #pragma once
 #include <iostream>
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
+
+#include <glbinding/gl/gl.h>
+
+using namespace gl;
+
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
 #include <array>
 #include <string_view>
 #include <unordered_map>
+
+#define GL_NONE 0
 
 // shader
 class CStdShader
@@ -335,7 +340,7 @@ public:
 	template<GLenum T, std::size_t D> friend void swap(CStdTexture<T, D> &first, CStdTexture<T, D> &second);
 
 public:
-	void Bind(GLenum offset) const
+	void Bind(GLuint offset) const
 	{
 		glActiveTexture(GL_TEXTURE0 + offset);
 
@@ -501,7 +506,7 @@ public:
 
 public:
 	void Bind() const;
-	void BindTexture(GLenum offset) const;
+	void BindTexture(GLuint offset) const;
 	void Unbind() const;
 	const CStdTexture<GL_TEXTURE_2D, 2> &GetTexture() const { return colorAttachment; }
 
@@ -532,5 +537,5 @@ public:
 	using CStdSwappable<CStdTexture3D>::CStdSwappable;
 
 public:
-	void Bind(GLenum offset) const;
+	void Bind(GLuint offset) const;
 };

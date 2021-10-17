@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 #define GLFW_INCLUDE_NONE
@@ -11,6 +12,7 @@
 #include "Scene.h"
 #include "Interactor.h"
 #include "Renderer.h"
+#include "FluidSim.h"
 
 namespace dynamol
 {
@@ -64,6 +66,7 @@ namespace dynamol
 
 		std::vector<std::unique_ptr<Interactor>> m_interactors;
 		std::vector<std::unique_ptr<Renderer>> m_renderers;
+		std::optional<FluidSim> m_fluidSim;
 
 		glm::vec3 m_backgroundColor = glm::vec3(0.2f, 0.2f, 0.2f);
 		glm::mat4 m_modelTransform = glm::mat4(1.0f);

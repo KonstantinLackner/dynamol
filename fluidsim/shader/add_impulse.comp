@@ -5,7 +5,7 @@ layout(local_size_x=1, local_size_y=1, local_size_z=1) in;
 layout(rgba16_snorm) 
 uniform image3D field_r;
 
-layout(rgba16_snorm)
+layout(rgba16_snorm) 
 uniform image3D field_w;
 
 uniform vec3 position;

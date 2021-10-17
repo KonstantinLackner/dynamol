@@ -53,6 +53,13 @@ Viewer::Viewer(GLFWwindow *window, Scene *scene) : m_window(window), m_scene(sce
 
 	m_interactors.emplace_back(std::make_unique<CameraInteractor>(this));
 	m_renderers.emplace_back(std::make_unique<SphereRenderer>(this));
+
+	static constexpr auto CubeSize = 128;
+	std::int32_t width;
+	std::int32_t height;
+	glfwGetWindowSize(window, &width, &height);
+	m_fluidSim.emplace(m_renderers.back().get(), std::array{width, height}, std::array{CubeSize, CubeSize, CubeSize});
+
 	m_renderers.emplace_back(std::make_unique<BoundingBoxRenderer>(this));
 
 	int i = 1;
@@ -75,7 +82,8 @@ void Viewer::display()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glViewport(0, 0, viewportSize().x, viewportSize().y);
 
-	// Fluidsim
+	m_fluidSim->Execute();
+
 	for (auto& r : m_renderers)
 	{
 		if (r->isEnabled())
@@ -387,6 +395,11 @@ void Viewer::endFrame()
 		saveImage(filename);
 		m_saveScreenshot = false;
 	}
+
+	ImGui::Begin("Debug Framebuffer");
+	const std::uint64_t textureHandle{m_fluidSim->GetDebugFramebufferTexture()};
+	ImGui::Image(reinterpret_cast<ImTextureID>(textureHandle), ImGui::GetContentRegionAvail());
+	ImGui::End();
 
 	if (m_showUi)
 		renderUi();

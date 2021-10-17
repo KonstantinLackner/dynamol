@@ -379,7 +379,7 @@ void CStdFramebuffer::Bind() const
 	glBindFramebuffer(GL_FRAMEBUFFER, FBO);
 }
 
-void CStdFramebuffer::BindTexture(const GLenum offset) const
+void CStdFramebuffer::BindTexture(const GLuint offset) const
 {
 	colorAttachment.Bind(offset);
 }
@@ -399,7 +399,7 @@ void CStdSwappableFramebuffer::Unbind() const
 	GetFront().Unbind();
 }
 
-void CStdSwappableTexture3D::Bind(const GLenum offset) const
+void CStdSwappableTexture3D::Bind(const GLuint offset) const
 {
 	GetFront().Bind(offset);
 }
