@@ -33,12 +33,25 @@ namespace dynamol
     class FluidSim
     {
     public:
+        struct Variables
+        {
+            float Dissipation{ 0.98f };
+            float Gravity{ 8.0f };
+            float Viscosity{ 0.0004 };
+            bool Boundaries{ false };
+            std::size_t NumJacobiRounds{ 4 };
+            //float ForceMultiplier{ 1.0f };
+        };
+
+    public:
         FluidSim(Renderer *renderer, const std::array<std::int32_t, 2> &windowDimensions, const std::array<std::int32_t, 3> &cubeDimensions);
         ~FluidSim();
 
     public:
         void Execute();
         GLuint GetDebugFramebufferTexture() const;
+        const CStdTexture3D &GetVelocityTexture() const;
+        Variables &GetVariables() { return variables; }
 
     private:
         void LoadShaders();
@@ -52,6 +65,7 @@ namespace dynamol
 
     private:
         static constexpr std::array<int32_t, 3> WorkGroupSize{8, 8, 8};
+        Variables variables;
         Renderer *m_renderer;
         std::array<std::int32_t, 2> m_windowDimensions;
         std::array<std::int32_t, 3> m_cubeDimensions;

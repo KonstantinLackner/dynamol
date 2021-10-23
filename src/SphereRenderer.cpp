@@ -168,6 +168,13 @@ SphereRenderer::SphereRenderer(Viewer* viewer) : Renderer(viewer)
 		},
 		{ "./res/model/globals.glsl" });
 
+	createShaderProgram("transformfeedback", {
+			{ GL_VERTEX_SHADER, "./fluidsim/shader/transform_feedback.vert"}
+	},
+		{ "./res/model/globals.glsl"});
+
+	shaderProgram("transformfeedback")->setUniform("minBounds", viewer->scene()->protein()->minimumBounds());
+
 	m_framebufferSize = viewer->viewportSize();
 
 	m_depthTexture = Texture::create(GL_TEXTURE_2D);
@@ -340,12 +347,17 @@ SphereRenderer::SphereRenderer(Viewer* viewer) : Renderer(viewer)
 	m_dofFramebuffer->attachTexture(GL_COLOR_ATTACHMENT0, m_sphereDiffuseTexture.get());
 	m_dofFramebuffer->attachTexture(GL_COLOR_ATTACHMENT1, m_surfaceDiffuseTexture.get());
 	m_dofFramebuffer->setDrawBuffers({ GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 });
-	
+
 	m_shadowFramebuffer = Framebuffer::create();
 	m_shadowFramebuffer->attachTexture(GL_COLOR_ATTACHMENT0, m_shadowColorTexture.get());
 	m_shadowFramebuffer->attachTexture(GL_DEPTH_ATTACHMENT, m_shadowDepthTexture.get());
 	m_shadowFramebuffer->setDrawBuffers({ GL_COLOR_ATTACHMENT0 });
-	
+
+	m_transformFeedback.reset(new TransformFeedback());
+	m_transformFeedback->setVaryings(shaderProgram("transformfeedback"), {"vCoordinates"}, GL_INTERLEAVED_ATTRIBS);
+
+	m_transformedCoordinates = Buffer::create();
+	m_transformedCoordinates->setStorage(viewer->scene()->protein()->atoms()[0].size() * sizeof(glm::vec4), nullptr, GL_NONE_BIT);
 }
 
 void SphereRenderer::display()
@@ -389,8 +401,8 @@ void SphereRenderer::display()
 	auto programDOFBlend = shaderProgram("dofblend");
 	auto programDisplay = shaderProgram("display");
 	auto programShadow = shaderProgram("shadow");
+	auto programTransformFeedback = shaderProgram("transformfeedback");
 
-	
 	// get cursor position for magic lens
 	double mouseX, mouseY;
 	glfwGetCursorPos(viewer()->window(), &mouseX, &mouseY);
@@ -655,15 +667,30 @@ void SphereRenderer::display()
 		reloadShaders();
 	}
 
-
 	// Read buffer from fluidsim
 	// Vertex binding setup
+	const globjects::Buffer *const buffer{m_vertices[currentTimestep].get()};
 	auto vertexBinding = m_vao->binding(0);
 	vertexBinding->setAttribute(0);
-	vertexBinding->setBuffer(m_vertices[currentTimestep].get(), 0, sizeof(vec4));
+	vertexBinding->setBuffer(buffer, 0, sizeof(vec4));
 	vertexBinding->setFormat(4, GL_FLOAT);
 	m_vao->enable(0);
 
+	m_transformedCoordinates->bindBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0);
+	viewer()->fluidSim()->GetVelocityTexture().Bind(0);
+	programTransformFeedback->use();
+
+	m_transformFeedback->bind();
+	m_transformFeedback->begin(GL_POINTS);
+
+	m_vao->drawArrays(GL_POINTS, 0, vertexCount);
+
+	m_transformFeedback->end();
+	m_transformFeedback->unbind();
+
+	vertexBinding->setBuffer(m_transformedCoordinates.get(), 0, sizeof(glm::vec4));
+
+	/* Used for interploation, which is not active
 	if (timestepCount > 0)
 	{
 		auto nextVertexBinding = m_vao->binding(1);
@@ -671,7 +698,7 @@ void SphereRenderer::display()
 		nextVertexBinding->setBuffer(m_vertices[nextTimestep].get(), 0, sizeof(vec4));
 		nextVertexBinding->setFormat(4, GL_FLOAT);
 		m_vao->enable(1);
-	}
+	}*/
 
 	//////////////////////////////////////////////////////////////////////////
 	// Shadow rendering pass

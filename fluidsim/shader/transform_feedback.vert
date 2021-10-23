@@ -1,11 +1,12 @@
-const GLchar* vertexShaderSrc = R"glsl(
-    in vec3 inValue;
-    uniform sampler2D grid;
-    out vec3 outValue;
+#version 450 core
 
-    void main()
-    {
-        // find valueinGrid
-        outValue = inValue + valueinGrid; 
-    }
-)glsl";
+in vec3 coords;
+layout(binding = 0) uniform sampler3D sampler;
+uniform vec3 minBounds;
+
+out vec3 vCoords;
+
+void main()
+{
+    vCoords = coords + textureLod(sampler, coords - minBounds, 0.0);
+}

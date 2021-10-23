@@ -17,6 +17,7 @@
 #include <globjects/Texture.h>
 #include <globjects/base/File.h>
 #include <globjects/TextureHandle.h>
+#include <globjects/TransformFeedback.h>
 #include <globjects/NamedString.h>
 #include <globjects/base/StaticStringSource.h>
 
@@ -73,6 +74,9 @@ namespace dynamol
 		std::vector< std::unique_ptr<globjects::Texture> > m_environmentTextures;
 		std::vector< std::unique_ptr<globjects::Texture> > m_materialTextures;
 		std::vector< std::unique_ptr<globjects::Texture> > m_bumpTextures;
+
+		std::unique_ptr<globjects::TransformFeedback> m_transformFeedback = nullptr;
+		std::unique_ptr<globjects::Buffer> m_transformedCoordinates = nullptr;
 
 		glm::ivec2 m_shadowMapSize = glm::ivec2(512, 512);
 		glm::ivec2 m_framebufferSize;

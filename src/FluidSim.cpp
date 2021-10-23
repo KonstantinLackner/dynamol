@@ -38,16 +38,6 @@ FluidSim::~FluidSim()
 {
 }
 
-namespace Variables
-{
-    static constexpr float Dissipation{ 0.98f };
-    static constexpr float Gravity{ 8.0f };
-    static constexpr float Viscosity{ 0.0004 };
-    static constexpr bool Boundaries{ false };
-    static constexpr std::size_t NumJacobiRounds{ 4 };
-    static constexpr float ForceMultiplier{ 1.0f };
-}
-
 void FluidSim::Execute()
 {
     const double now{glfwGetTime()};
@@ -55,15 +45,13 @@ void FluidSim::Execute()
     m_lastTime = now;
     DoDroplets();
 
-    using namespace Variables;
-
     m_timerQuery->begin(GL_TIME_ELAPSED);
 
 #pragma region Advection
     m_advectionProgram->setUniform("delta_t", m_dt);
-    m_advectionProgram->setUniform("dissipation", Dissipation);
+    m_advectionProgram->setUniform("dissipation", variables.Dissipation);
     m_advectionProgram->setUniform("gs", m_gridScale);
-    m_advectionProgram->setUniform("gravity", Gravity);
+    m_advectionProgram->setUniform("gravity", variables.Gravity);
     BindImage(m_advectionProgram, "quantity_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
     BindImage(m_advectionProgram, "quantity_w", m_velocityTexture.GetBack(), 0, GL_WRITE_ONLY);
     BindImage(m_advectionProgram, "velocity", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
@@ -87,7 +75,7 @@ void FluidSim::Execute()
 #pragma endregion
 
 #pragma region Diffuse
-    const float alpha{ (m_gridScale * m_gridScale) / (Viscosity * m_dt) };
+    const float alpha{ (m_gridScale * m_gridScale) / (variables.Viscosity * m_dt) };
     const float beta{ alpha + 6.0f };
     SolvePoissonSystem(m_velocityTexture, m_velocityTexture.GetFront(), alpha, beta);
 #pragma endregion
@@ -113,7 +101,7 @@ void FluidSim::Execute()
 #pragma endregion
 
 #pragma region Bounds
-    if (Boundaries)
+    if (variables.Boundaries)
     {
         SetBounds(m_velocityTexture, -1);
     }
@@ -152,6 +140,11 @@ void FluidSim::Execute()
 GLuint FluidSim::GetDebugFramebufferTexture() const
 {
     return m_debugFramebuffer.GetTexture().GetTexture();
+}
+
+const CStdTexture3D &FluidSim::GetVelocityTexture() const
+{
+    return m_velocityTexture.GetFront();
 }
 
 void FluidSim::LoadShaders()
@@ -210,7 +203,7 @@ void FluidSim::SolvePoissonSystem(CStdSwappableTexture3D& swappableTexture, cons
     m_jacobiProgram->setUniform("beta", beta);
     BindImage(m_jacobiProgram, "fieldb_r", m_temporaryTexture, 0, GL_READ_ONLY);
 
-    for (std::size_t i{ 0 }; i < Variables::NumJacobiRounds; ++i)
+    for (std::size_t i{ 0 }; i < variables.NumJacobiRounds; ++i)
     {
         BindImage(m_jacobiProgram, "fieldx_r", swappableTexture.GetFront(), 1, GL_READ_ONLY);
         BindImage(m_jacobiProgram, "field_out", swappableTexture.GetBack(), 2, GL_WRITE_ONLY);

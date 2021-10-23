@@ -87,11 +87,11 @@ void Viewer::display()
 	for (auto& r : m_renderers)
 	{
 		if (r->isEnabled())
-		{		
+		{
 			r->display();
 		}
 	}
-	
+
 	for (auto& i : m_interactors)
 	{
 		i->display();
@@ -108,6 +108,11 @@ GLFWwindow * Viewer::window()
 Scene* Viewer::scene()
 {
 	return m_scene;
+}
+
+FluidSim* Viewer::fluidSim()
+{
+	return &m_fluidSim.value();
 }
 
 ivec2 Viewer::viewportSize() const
@@ -454,6 +459,23 @@ void Viewer::mainMenu()
 			ImGui::EndMenu();
 		}
 
+		ImGui::EndMenu();
+	}
+
+	if (ImGui::BeginMenu("FluidSim")) {
+		auto &variables = m_fluidSim->GetVariables();
+		ImGui::ColorEdit3("Background", glm::value_ptr(m_backgroundColor));
+		ImGui::SliderFloat("Dissipation", &variables.Dissipation, 0.0f, 1.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+		ImGui::SliderFloat("Gravity", &variables.Gravity, 0.0f, 30.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+		ImGui::SliderFloat("Viscosity", &variables.Viscosity, 0.0001f, 1.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+
+		static constexpr auto NumJacobiImGuiDataType = sizeof(std::size_t) == 8 ? ImGuiDataType_U64 : ImGuiDataType_U32;
+		static constexpr auto NumJacobiMin = 0;
+		static constexpr auto NumJacobiMax = 10;
+
+		ImGui::SliderScalar("NumJacobiRounds", NumJacobiImGuiDataType, &variables.NumJacobiRounds, &NumJacobiMin, &NumJacobiMax, "%zu", ImGuiSliderFlags_AlwaysClamp);
+		//ImGui::SliderFloat("ForceMultiplier", &resolutionScale, 0.1f, 10.0f);
+		ImGui::Checkbox("Boundaries", &variables.Boundaries);
 		ImGui::EndMenu();
 	}
 }

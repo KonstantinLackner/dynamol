@@ -25,6 +25,7 @@ namespace dynamol
 
 		GLFWwindow * window();
 		Scene* scene();
+		FluidSim *fluidSim();
 
 		glm::ivec2 viewportSize() const;
 
