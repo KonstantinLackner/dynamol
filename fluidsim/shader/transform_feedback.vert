@@ -1,12 +1,12 @@
 #version 450 core
 
-in vec3 coords;
-layout(binding = 0) uniform sampler3D sampler;
+in vec4 coords;
+layout(rgba16_snorm, binding = 0) uniform image3D image;
 uniform vec3 minBounds;
 
-out vec3 vCoords;
+out vec4 vCoords;
 
 void main()
 {
-    vCoords = coords + textureLod(sampler, coords - minBounds, 0.0);
+    vCoords = coords + vec4(imageLoad(image, ivec3(coords.xyz - minBounds)).xyz, 0);
 }

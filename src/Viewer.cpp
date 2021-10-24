@@ -58,7 +58,10 @@ Viewer::Viewer(GLFWwindow *window, Scene *scene) : m_window(window), m_scene(sce
 	std::int32_t width;
 	std::int32_t height;
 	glfwGetWindowSize(window, &width, &height);
-	m_fluidSim.emplace(m_renderers.back().get(), std::array{width, height}, std::array{CubeSize, CubeSize, CubeSize});
+	const glm::vec3 &minBounds{scene->protein()->minimumBounds()};
+	const glm::vec3 &maxBounds{scene->protein()->maximumBounds()};
+	const std::array<std::int32_t, 3> cubeSize{maxBounds.x + 1 - minBounds.x, maxBounds.y + 1 - minBounds.y, maxBounds.z + 1 - minBounds.z};
+	m_fluidSim.emplace(m_renderers.back().get(), std::array{width, height}, cubeSize);
 
 	m_renderers.emplace_back(std::make_unique<BoundingBoxRenderer>(this));
 
@@ -247,7 +250,7 @@ void Viewer::keyCallback(GLFWwindow* window, int key, int scancode, int action, 
 		{
 			viewer->m_saveScreenshot = true;
 		}
-		else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9 && action == GLFW_RELEASE)		
+		else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9 && action == GLFW_RELEASE)
 		{
 			int index = key - GLFW_KEY_1;
 
@@ -390,7 +393,7 @@ void Viewer::endFrame()
 			filename = ss.str();
 
 			std::ifstream f(filename.c_str());
-			
+
 			if (!f.good())
 				break;
 		}

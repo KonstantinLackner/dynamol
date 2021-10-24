@@ -169,7 +169,8 @@ SphereRenderer::SphereRenderer(Viewer* viewer) : Renderer(viewer)
 		{ "./res/model/globals.glsl" });
 
 	createShaderProgram("transformfeedback", {
-			{ GL_VERTEX_SHADER, "./fluidsim/shader/transform_feedback.vert"}
+			{ GL_VERTEX_SHADER, "./fluidsim/shader/transform_feedback.vert"},
+			{ GL_GEOMETRY_SHADER, "./fluidsim/shader/transform_feedback.geom"}
 	},
 		{ "./res/model/globals.glsl"});
 
@@ -354,7 +355,7 @@ SphereRenderer::SphereRenderer(Viewer* viewer) : Renderer(viewer)
 	m_shadowFramebuffer->setDrawBuffers({ GL_COLOR_ATTACHMENT0 });
 
 	m_transformFeedback.reset(new TransformFeedback());
-	m_transformFeedback->setVaryings(shaderProgram("transformfeedback"), {"vCoordinates"}, GL_INTERLEAVED_ATTRIBS);
+	m_transformFeedback->setVaryings(shaderProgram("transformfeedback"), {"gCoords"}, GL_INTERLEAVED_ATTRIBS);
 
 	m_transformedCoordinates = Buffer::create();
 	m_transformedCoordinates->setStorage(viewer->scene()->protein()->atoms()[0].size() * sizeof(glm::vec4), nullptr, GL_NONE_BIT);
@@ -676,8 +677,10 @@ void SphereRenderer::display()
 	vertexBinding->setFormat(4, GL_FLOAT);
 	m_vao->enable(0);
 
+	glEnable(GL_RASTERIZER_DISCARD);
+
 	m_transformedCoordinates->bindBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0);
-	viewer()->fluidSim()->GetVelocityTexture().Bind(0);
+	viewer()->fluidSim()->GetVelocityTexture().BindImage(0, GL_READ_ONLY);
 	programTransformFeedback->use();
 
 	m_transformFeedback->bind();
@@ -687,6 +690,8 @@ void SphereRenderer::display()
 
 	m_transformFeedback->end();
 	m_transformFeedback->unbind();
+
+	glDisable(GL_RASTERIZER_DISCARD);
 
 	vertexBinding->setBuffer(m_transformedCoordinates.get(), 0, sizeof(glm::vec4));
 
@@ -711,12 +716,12 @@ void SphereRenderer::display()
 	glClearDepth(1.0f);
 	glClearColor(0.0, 0.0, 0.0, 65535.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	
+
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_ONE, GL_ONE);
 	glBlendEquation(GL_MAX);
 	//glBlendEquation(GL_FUNC_ADD);
-	
+
 	glEnable(GL_DEPTH_TEST);
 //	glDepthFunc(GL_LESS);
 	glDepthFunc(GL_ALWAYS);
