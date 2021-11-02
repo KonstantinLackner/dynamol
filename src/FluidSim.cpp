@@ -223,8 +223,10 @@ void FluidSim::SetBounds(CStdSwappableTexture3D& texture, const float scale)
 {
     m_boundaryProgram->setUniform("scale", scale);
     m_boundaryProgram->setUniform("box_size", glm::vec3{ static_cast<float>(m_cubeDimensions[0]), static_cast<float>(m_cubeDimensions[1]), static_cast<float>(m_cubeDimensions[2]) });
+    BindImage(m_boundaryProgram, "field_r", texture.GetFront(), 0, GL_READ_ONLY);
+    BindImage(m_boundaryProgram, "field_w", texture.GetBack(), 1, GL_WRITE_ONLY);
     Compute(m_boundaryProgram);
-    texture.SwapBuffers();
+    m_velocityTexture.SwapBuffers();
 }
 
 void FluidSim::DoDroplets()

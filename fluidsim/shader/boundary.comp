@@ -11,13 +11,14 @@ uniform image3D field_w;
 uniform float scale;
 uniform vec3 box_size;
 
+/*
+
 void main()
 {
 	ivec3 coord = ivec3(gl_GlobalInvocationID);
 	ivec3 img_size = imageSize(field_r);
 	ivec3 offset = ivec3(0);
 
-	/*
 	if (coord.x == 0)
 	{
 		offset += ivec3(1, 0, 0);
@@ -44,15 +45,19 @@ void main()
 	{
 		offset += ivec3(0, 0, -1);
 	}
-	*/
 
 	vec4 value = imageLoad(field_r, coord);
 	
-	/*
 	if (offset != ivec3(0, 0, 0) {
 		value *= scale;
 	}
-	*/
 
+	imageStore(field_w, coord, value);
+}*/
+
+void main()
+{
+	ivec3 coord = ivec3(gl_GlobalInvocationID);
+	vec4 value = imageLoad(field_r, coord);
 	imageStore(field_w, coord, value);
 }

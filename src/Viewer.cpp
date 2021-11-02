@@ -61,6 +61,7 @@ Viewer::Viewer(GLFWwindow *window, Scene *scene) : m_window(window), m_scene(sce
 	const glm::vec3 &minBounds{scene->protein()->minimumBounds()};
 	const glm::vec3 &maxBounds{scene->protein()->maximumBounds()};
 	const std::array<std::int32_t, 3> cubeSize{maxBounds.x + 1 - minBounds.x, maxBounds.y + 1 - minBounds.y, maxBounds.z + 1 - minBounds.z};
+	//const std::array<std::int32_t, 3> cubeSize{256, 256, 256};
 	m_fluidSim.emplace(m_renderers.back().get(), std::array{width, height}, cubeSize);
 
 	m_renderers.emplace_back(std::make_unique<BoundingBoxRenderer>(this));

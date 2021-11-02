@@ -459,7 +459,9 @@ public:
 	}
 
 	const T &GetFront() const { return *front; }
+	T &GetFront() { return *front; }
 	const T &GetBack() const { return *back; }
+	T &GetBack() { return *back; }
 
 private:
 	T buffer1;
