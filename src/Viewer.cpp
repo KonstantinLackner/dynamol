@@ -480,6 +480,7 @@ void Viewer::mainMenu()
 		ImGui::SliderScalar("NumJacobiRounds", NumJacobiImGuiDataType, &variables.NumJacobiRounds, &NumJacobiMin, &NumJacobiMax, "%zu", ImGuiSliderFlags_AlwaysClamp);
 		//ImGui::SliderFloat("ForceMultiplier", &resolutionScale, 0.1f, 10.0f);
 		ImGui::Checkbox("Boundaries", &variables.Boundaries);
+		ImGui::SliderFloat("Global Gravity", &variables.GlobalGravity, 0.f, 10.f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
 		ImGui::EndMenu();
 	}
 }

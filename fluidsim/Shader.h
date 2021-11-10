@@ -434,7 +434,6 @@ template<typename T>
 class CStdSwappable
 {
 public:
-	CStdSwappable() : buffer1{}, buffer2{}, front{nullptr}, back{nullptr} {}
 	template<typename... Args> CStdSwappable(Args... args) : buffer1{args...}, buffer2{args...}, front{&buffer1}, back{&buffer2} {}
 
 	CStdSwappable(CStdSwappable<T> &&other) : CStdSwappable{}

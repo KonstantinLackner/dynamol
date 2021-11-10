@@ -53,11 +53,12 @@ void FluidSim::Execute()
     m_advectionProgram->setUniform("gs", m_gridScale);
     m_advectionProgram->setUniform("gravity", variables.Gravity);
     BindImage(m_advectionProgram, "quantity_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
-    BindImage(m_advectionProgram, "quantity_w", m_velocityTexture.GetBack(), 0, GL_WRITE_ONLY);
-    BindImage(m_advectionProgram, "velocity", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
+    BindImage(m_advectionProgram, "quantity_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
+    BindImage(m_advectionProgram, "velocity", m_velocityTexture.GetFront(), 2, GL_READ_ONLY);
     Compute(m_advectionProgram);
     m_velocityTexture.SwapBuffers();
 #pragma endregion
+
 
 #pragma region Impulse
     if (m_impulseState.ForceActive)
@@ -80,21 +81,36 @@ void FluidSim::Execute()
     SolvePoissonSystem(m_velocityTexture, m_velocityTexture.GetFront(), alpha, beta);
 #pragma endregion
 
+/*
+#pragma region Gravity
+    m_globalGravityProgram->setUniform("gravity", variables.GlobalGravity);
+    BindImage(m_globalGravityProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
+    BindImage(m_globalGravityProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
+    Compute(m_globalGravityProgram);
+    m_velocityTexture.SwapBuffers();
+#pragma endregion
+*/
+
 #pragma region Projection
     m_divergenceProgram->setUniform("gs", m_gridScale);
     BindImage(m_divergenceProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
     BindImage(m_divergenceProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
     Compute(m_divergenceProgram);
 
+    // Solve for P in: Laplacian(P) = div(W)
     SolvePoissonSystem(m_pressureTexture, m_velocityTexture.GetBack(), -1, 6.0f);
 
+    // Calculate grad(P)
     m_gradientProgram->setUniform("gs", m_gridScale);
     BindImage(m_gradientProgram, "field_r", m_pressureTexture.GetFront(), 0, GL_READ_ONLY);
     BindImage(m_gradientProgram, "field_w", m_pressureTexture.GetBack(), 1, GL_WRITE_ONLY);
     Compute(m_gradientProgram);
 
+    // No swap, back buffer has the gradient
+
+    // Calculate U = W - grad(P) where div(U)=0
     BindImage(m_subtractProgram, "a", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
-    BindImage(m_subtractProgram, "b", m_pressureTexture.GetFront(), 1, GL_READ_ONLY);
+    BindImage(m_subtractProgram, "b", m_pressureTexture.GetBack(), 1, GL_READ_ONLY);
     BindImage(m_subtractProgram, "c", m_velocityTexture.GetBack(), 2, GL_WRITE_ONLY);
     Compute(m_subtractProgram);
     m_velocityTexture.SwapBuffers();
@@ -106,6 +122,7 @@ void FluidSim::Execute()
         SetBounds(m_velocityTexture, -1);
     }
 #pragma endregion
+
     // Transform feedback read
 #pragma region TimeTrack
     m_timerQuery->end(GL_TIME_ELAPSED);
@@ -157,7 +174,7 @@ void FluidSim::LoadShaders()
         this->*program = m_renderer->shaderProgram(name.data());
     };
 
-    static constexpr std::array<std::pair<globjects::Program *(FluidSim::*), std::string_view>, 9> ProgramList
+    static constexpr std::array<std::pair<globjects::Program *(FluidSim::*), std::string_view>, 10> ProgramList
     {{
         {&FluidSim::m_addImpulseProgram, "add_impulse"},
         {&FluidSim::m_advectionProgram, "advection"},
@@ -167,7 +184,8 @@ void FluidSim::LoadShaders()
         {&FluidSim::m_subtractProgram, "subtract"},
         {&FluidSim::m_boundaryProgram, "boundary"},
         {&FluidSim::m_copyProgram, "copy"},
-        {&FluidSim::m_clearProgram, "clear"}
+        {&FluidSim::m_clearProgram, "clear"},
+        {&FluidSim::m_globalGravityProgram, "global_gravity"}
     }};
 
     for (const auto &[program, name] : ProgramList)
@@ -222,7 +240,7 @@ void FluidSim::CopyImage(const CStdTexture3D& source, CStdTexture3D& destination
 void FluidSim::SetBounds(CStdSwappableTexture3D& texture, const float scale)
 {
     m_boundaryProgram->setUniform("scale", scale);
-    m_boundaryProgram->setUniform("box_size", glm::vec3{ static_cast<float>(m_cubeDimensions[0]), static_cast<float>(m_cubeDimensions[1]), static_cast<float>(m_cubeDimensions[2]) });
+    // m_boundaryProgram->setUniform("box_size", glm::vec3{ static_cast<float>(m_cubeDimensions[0]), static_cast<float>(m_cubeDimensions[1]), static_cast<float>(m_cubeDimensions[2]) });
     BindImage(m_boundaryProgram, "field_r", texture.GetFront(), 0, GL_READ_ONLY);
     BindImage(m_boundaryProgram, "field_w", texture.GetBack(), 1, GL_WRITE_ONLY);
     Compute(m_boundaryProgram);

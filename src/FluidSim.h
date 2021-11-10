@@ -35,10 +35,11 @@ namespace dynamol
     public:
         struct Variables
         {
-            float Dissipation{ 0.98f };
+            float Dissipation{ 0.99f };
             float Gravity{ 8.0f };
             float Viscosity{ 0.0004 };
-            bool Boundaries{ false };
+            float GlobalGravity{ 0.f };
+            bool Boundaries{ true };
             std::size_t NumJacobiRounds{ 4 };
             //float ForceMultiplier{ 1.0f };
         };
@@ -82,6 +83,7 @@ namespace dynamol
         globjects::Program *m_copyProgram{nullptr};
         globjects::Program *m_clearProgram{nullptr};
         globjects::Program *m_renderPlaneProgram{nullptr};
+        globjects::Program *m_globalGravityProgram{nullptr};
 
         CStdSwappableTexture3D m_velocityTexture;
         CStdSwappableTexture3D m_pressureTexture; // TODO: Pressure only needs 1 channel

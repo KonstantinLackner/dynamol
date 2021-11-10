@@ -357,8 +357,11 @@ SphereRenderer::SphereRenderer(Viewer* viewer) : Renderer(viewer)
 	m_transformFeedback.reset(new TransformFeedback());
 	m_transformFeedback->setVaryings(shaderProgram("transformfeedback"), {"gCoords"}, GL_INTERLEAVED_ATTRIBS);
 
-	m_transformedCoordinates = Buffer::create();
-	m_transformedCoordinates->setStorage(viewer->scene()->protein()->atoms()[0].size() * sizeof(glm::vec4), nullptr, GL_NONE_BIT);
+	const auto &molecule = viewer->scene()->protein()->atoms()[0];
+	const std::size_t storageSize{molecule.size() * sizeof(glm::vec4)}
+
+	m_transformedCoordinates.GetFront() = TransformFeedbackVAO{molecule.data(), storageSize};
+	m_transformedCoordinates.GetBack() = TransformFeedbackVAO{nullptr, storageSize};
 }
 
 void SphereRenderer::display()
@@ -669,31 +672,26 @@ void SphereRenderer::display()
 	}
 
 	// Read buffer from fluidsim
-	// Vertex binding setup
-	const globjects::Buffer *const buffer{m_vertices[currentTimestep].get()};
-	auto vertexBinding = m_vao->binding(0);
-	vertexBinding->setAttribute(0);
-	vertexBinding->setBuffer(buffer, 0, sizeof(vec4));
-	vertexBinding->setFormat(4, GL_FLOAT);
-	m_vao->enable(0);
-
+	m_vao->binding(0)->setBuffer(nullptr);
 	glEnable(GL_RASTERIZER_DISCARD);
 
-	m_transformedCoordinates->bindBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0);
+	m_transformedCoordinates.GetBack()->buffer->bindBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0);
 	viewer()->fluidSim()->GetVelocityTexture().BindImage(0, GL_READ_ONLY);
 	programTransformFeedback->use();
 
 	m_transformFeedback->bind();
 	m_transformFeedback->begin(GL_POINTS);
 
-	m_vao->drawArrays(GL_POINTS, 0, vertexCount);
+	m_transformedCoordinates.GetFront()->vao->drawArrays(GL_POINTS, 0, vertexCount);
 
 	m_transformFeedback->end();
 	m_transformFeedback->unbind();
 
 	glDisable(GL_RASTERIZER_DISCARD);
+	m_transformedCoordinates.GetBack()->buffer->unbind(GL_TRANSFORM_FEEDBACK_BUFFER);
+	m_transformedCoordinates.SwapBuffers();
 
-	vertexBinding->setBuffer(m_transformedCoordinates.get(), 0, sizeof(glm::vec4));
+	m_vao->binding(0)->setBuffer(m_transformedCoordinates.GetFront().buffer.get());
 
 	/* Used for interploation, which is not active
 	if (timestepCount > 0)
