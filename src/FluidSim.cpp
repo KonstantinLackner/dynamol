@@ -91,6 +91,13 @@ void FluidSim::Execute()
 #pragma endregion
 */
 
+#pragma region Bounds
+    if (variables.Boundaries)
+    {
+        SetBounds(m_velocityTexture, -1);
+    }
+#pragma endregion
+
 #pragma region Projection
     m_divergenceProgram->setUniform("gs", m_gridScale);
     BindImage(m_divergenceProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
@@ -114,13 +121,6 @@ void FluidSim::Execute()
     BindImage(m_subtractProgram, "c", m_velocityTexture.GetBack(), 2, GL_WRITE_ONLY);
     Compute(m_subtractProgram);
     m_velocityTexture.SwapBuffers();
-#pragma endregion
-
-#pragma region Bounds
-    if (variables.Boundaries)
-    {
-        SetBounds(m_velocityTexture, -1);
-    }
 #pragma endregion
 
     // Transform feedback read

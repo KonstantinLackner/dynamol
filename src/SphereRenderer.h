@@ -1,7 +1,5 @@
 #pragma once
 #include "Renderer.h"
-#include "Shader.h"
-
 #include <memory>
 
 #include <glm/glm.hpp>
@@ -27,25 +25,8 @@ namespace dynamol
 {
 	class Viewer;
 
-	public:
-		struct TransformFeedbackVAO
-		{
-			std::unique_ptr<globjects::Buffer> buffer;
-			std::unique_ptr<globjects::VertexArray> vao;
-
-			TransformFeedbackVAO() : vao{}, buffer{} {}
-
-			TransformFeedbackVAO(glm::vec4 *const data, const std::size_t size) : vao{std::make_unique<globjects::VertexArray>()}, buffer{Buffer::create()}
-			{
-				buffer->setStorage(size, data, GL_NONE_BIT);
-				auto vertexBinding = vao->binding(0);
-				vertexBinding->setAttribute(0);
-				vertexBinding->setBuffer(buffer.get(), 0, sizeof(glm::vec4));
-				vertexBinding->setFormat(4, GL_FLOAT);
-				vao->enable(0);
-			}
-		};
-
+	class SphereRenderer : public Renderer
+	{
 	public:
 		SphereRenderer(Viewer *viewer);
 		virtual void display();
@@ -95,7 +76,7 @@ namespace dynamol
 		std::vector< std::unique_ptr<globjects::Texture> > m_bumpTextures;
 
 		std::unique_ptr<globjects::TransformFeedback> m_transformFeedback = nullptr;
-		CStdSwappable<TransformFeedbackVAO> m_transformedCoordinates;
+		std::unique_ptr<globjects::Buffer> m_transformedCoordinates = nullptr;
 
 		glm::ivec2 m_shadowMapSize = glm::ivec2(512, 512);
 		glm::ivec2 m_framebufferSize;
