@@ -1,0 +1,25 @@
+#version 430 core
+
+layout(local_size_x=1, local_size_y=1, local_size_z=1) in;
+
+layout(rgba16_snorm) 
+uniform image3D field_w;
+
+void main()
+{
+	ivec3 coord = ivec3(gl_GlobalInvocationID);
+
+	if (coord.x == 50 && coord.y == 50)
+	{
+		vec4 value = vec4(1, 0, 0, 0);
+		imageStore(field_w, coord, value);
+	}
+}
+
+/*
+void main()
+{
+	ivec3 coord = ivec3(gl_GlobalInvocationID);
+	vec4 value = imageLoad(field_r, coord);
+	imageStore(field_w, coord, value);
+}*/

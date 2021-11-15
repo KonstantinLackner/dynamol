@@ -39,8 +39,9 @@ namespace dynamol
             float Gravity{ 8.0f };
             float Viscosity{ 0.0004 };
             float GlobalGravity{ 0.f };
+            bool HasSeeded{ false };
             bool Boundaries{ true };
-            std::size_t NumJacobiRounds{ 4 };
+            std::size_t NumJacobiRounds{ 40 };
             //float ForceMultiplier{ 1.0f };
         };
 
@@ -58,7 +59,7 @@ namespace dynamol
         void LoadShaders();
         void BindImage(globjects::Program *program, std::string_view name, const CStdTexture3D &texture, int value, GLenum access);
         void Compute(globjects::Program *program);
-        void SolvePoissonSystem(CStdSwappableTexture3D &swappableTexture, const CStdTexture3D &initialValue, float alpha, float beta);
+        void SolvePoissonSystem(CStdSwappableTexture3D &swappableTexture, const CStdTexture3D &initialValue, float alpha, float beta, bool isProject);
         void CopyImage(const CStdTexture3D &source, CStdTexture3D &destination);
         void SetBounds(CStdSwappableTexture3D &texture, float scale);
         void DoDroplets();
@@ -84,6 +85,7 @@ namespace dynamol
         globjects::Program *m_clearProgram{nullptr};
         globjects::Program *m_renderPlaneProgram{nullptr};
         globjects::Program *m_globalGravityProgram{nullptr};
+        globjects::Program *m_seedProgram{nullptr};
 
         CStdSwappableTexture3D m_velocityTexture;
         CStdSwappableTexture3D m_pressureTexture; // TODO: Pressure only needs 1 channel

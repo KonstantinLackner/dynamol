@@ -677,6 +677,7 @@ void SphereRenderer::display()
 	vertexBinding->setFormat(4, GL_FLOAT);
 	m_vao->enable(0);
 
+
 	glEnable(GL_RASTERIZER_DISCARD);
 
 	m_transformedCoordinates->bindBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0);

@@ -474,8 +474,8 @@ void Viewer::mainMenu()
 		ImGui::SliderFloat("Viscosity", &variables.Viscosity, 0.0001f, 1.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
 
 		static constexpr auto NumJacobiImGuiDataType = sizeof(std::size_t) == 8 ? ImGuiDataType_U64 : ImGuiDataType_U32;
-		static constexpr auto NumJacobiMin = 0;
-		static constexpr auto NumJacobiMax = 10;
+		static constexpr auto NumJacobiMin = 20;
+		static constexpr auto NumJacobiMax = 80;
 
 		ImGui::SliderScalar("NumJacobiRounds", NumJacobiImGuiDataType, &variables.NumJacobiRounds, &NumJacobiMin, &NumJacobiMax, "%zu", ImGuiSliderFlags_AlwaysClamp);
 		//ImGui::SliderFloat("ForceMultiplier", &resolutionScale, 0.1f, 10.0f);
