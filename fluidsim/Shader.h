@@ -352,6 +352,11 @@ public:
 		CStdTextureHelper<Target, Dimensions>::SetData(*this, data);
 	}
 
+	void Clear() const
+	{
+		glClearTexImage(texture, 0, format, type, nullptr);
+	}
+
 	GLuint GetTexture() const { return texture; }
 
 protected:

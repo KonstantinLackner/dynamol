@@ -16,12 +16,12 @@ FluidSim::FluidSim(Renderer *const renderer, const std::array<std::int32_t, 2> &
       m_timerQuery{std::make_unique<globjects::Query>()},
 	  m_windowDimensions{windowDimensions},
 	  m_cubeDimensions{cubeDimensions},
-      m_velocityTexture{cubeDimensions[0], cubeDimensions[1], cubeDimensions[2], 4, true},
-      m_pressureTexture{cubeDimensions[0], cubeDimensions[1], cubeDimensions[2], 4, true},
-      m_divergenceTexture{cubeDimensions[0], cubeDimensions[1], cubeDimensions[2], 1, true},
-	  m_temporaryTexture{cubeDimensions[0], cubeDimensions[1], cubeDimensions[2], 4, true},
+      m_velocityTexture{cubeDimensions[0], cubeDimensions[1], cubeDimensions[2], 4, false},
+      m_pressureTexture{cubeDimensions[0], cubeDimensions[1], cubeDimensions[2], 4, false},
+      m_divergenceTexture{cubeDimensions[0], cubeDimensions[1], cubeDimensions[2], 1, false},
+	  m_temporaryTexture{cubeDimensions[0], cubeDimensions[1], cubeDimensions[2], 4, false},
       m_debugFramebuffer{windowDimensions[0], windowDimensions[1]},
-      m_gridScale{1.0f / cubeDimensions[0]},
+      m_gridScale{1.0f},
       m_splatRadius{cubeDimensions[0] * 0.37f},
       m_dt{0},
       m_lastTime{0},
@@ -47,6 +47,20 @@ void FluidSim::Execute()
 
     m_timerQuery->begin(GL_TIME_ELAPSED);
 
+/*
+#pragma region Seed
+    BindImage(m_seedProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
+    Compute(m_seedProgram);
+    m_velocityTexture.SwapBuffers();
+#pragma endregion
+*/
+#pragma region Bounds
+    if (variables.Boundaries)
+    {
+        SetBounds(m_velocityTexture, -1);
+    }
+#pragma endregion
+
 #pragma region Advection
     m_advectionProgram->setUniform("delta_t", m_dt);
     m_advectionProgram->setUniform("dissipation", variables.Dissipation);
@@ -57,6 +71,13 @@ void FluidSim::Execute()
     BindImage(m_advectionProgram, "velocity", m_velocityTexture.GetFront(), 2, GL_READ_ONLY);
     Compute(m_advectionProgram);
     m_velocityTexture.SwapBuffers();
+#pragma endregion
+
+
+#pragma region Diffuse
+    const float alpha{ (m_gridScale * m_gridScale) / (variables.Viscosity * m_dt) };
+    const float beta{ 1.0f / (4.0f + alpha) };
+    SolvePoissonSystem(m_velocityTexture, m_velocityTexture.GetFront(), alpha, beta, false);
 #pragma endregion
 
 
@@ -75,12 +96,6 @@ void FluidSim::Execute()
 
 #pragma endregion
 
-#pragma region Diffuse
-    const float alpha{ (m_gridScale * m_gridScale) / (variables.Viscosity * m_dt) };
-    const float beta{ alpha + 6.0f };
-    SolvePoissonSystem(m_velocityTexture, m_velocityTexture.GetFront(), alpha, beta);
-#pragma endregion
-
 /*
 #pragma region Gravity
     m_globalGravityProgram->setUniform("gravity", variables.GlobalGravity);
@@ -90,22 +105,25 @@ void FluidSim::Execute()
     m_velocityTexture.SwapBuffers();
 #pragma endregion
 */
-
-#pragma region Bounds
-    if (variables.Boundaries)
-    {
-        SetBounds(m_velocityTexture, -1);
-    }
-#pragma endregion
-
+    
 #pragma region Projection
     m_divergenceProgram->setUniform("gs", m_gridScale);
     BindImage(m_divergenceProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
     BindImage(m_divergenceProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
-    Compute(m_divergenceProgram);
+    Compute(m_divergenceProgram);   
+
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    m_pressureTexture.GetFront().Clear();
+
+#pragma region Bounds
+    if (variables.Boundaries)
+    {
+        SetBounds(m_pressureTexture, 1);
+    }
+#pragma endregion
 
     // Solve for P in: Laplacian(P) = div(W)
-    SolvePoissonSystem(m_pressureTexture, m_velocityTexture.GetBack(), -1, 6.0f);
+    SolvePoissonSystem(m_pressureTexture, m_velocityTexture.GetBack(), -1, 0.25f, true);
 
     // Calculate grad(P)
     m_gradientProgram->setUniform("gs", m_gridScale);
@@ -114,7 +132,12 @@ void FluidSim::Execute()
     Compute(m_gradientProgram);
 
     // No swap, back buffer has the gradient
-
+#pragma region Bounds
+    if (variables.Boundaries)
+    {
+        SetBounds(m_velocityTexture, -1);
+    }
+#pragma endregion
     // Calculate U = W - grad(P) where div(U)=0
     BindImage(m_subtractProgram, "a", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
     BindImage(m_subtractProgram, "b", m_pressureTexture.GetBack(), 1, GL_READ_ONLY);
@@ -145,7 +168,7 @@ void FluidSim::Execute()
     m_renderPlaneProgram->use();
     m_velocityTexture.Bind(0);
     m_renderPlaneProgram->setUniform("sampler", 0);
-    m_renderPlaneProgram->setUniform("depth", 0.0f);
+    m_renderPlaneProgram->setUniform("depth", 5.0f);
     m_quad.Bind();
 
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -167,6 +190,8 @@ const CStdTexture3D &FluidSim::GetVelocityTexture() const
 void FluidSim::LoadShaders()
 {
     globjects::Shader::globalReplace("layout(local_size_x=1, local_size_y=1, local_size_z=1)", "layout(local_size_x=8, local_size_y=8, local_size_z=8)");
+    globjects::Shader::globalReplace("layout(rgba16_snorm)", "layout(rgba16f)");
+    globjects::Shader::globalReplace("layout(r16_snorm)", "layout(r16f)");
 
     const auto addShaderProgram = [this](globjects::Program *(FluidSim::*program), std::string_view name, std::initializer_list<std::pair<gl::GLenum, std::string>> shaders)
     {
@@ -174,7 +199,7 @@ void FluidSim::LoadShaders()
         this->*program = m_renderer->shaderProgram(name.data());
     };
 
-    static constexpr std::array<std::pair<globjects::Program *(FluidSim::*), std::string_view>, 10> ProgramList
+    static constexpr std::array<std::pair<globjects::Program *(FluidSim::*), std::string_view>, 11> ProgramList
     {{
         {&FluidSim::m_addImpulseProgram, "add_impulse"},
         {&FluidSim::m_advectionProgram, "advection"},
@@ -185,7 +210,8 @@ void FluidSim::LoadShaders()
         {&FluidSim::m_boundaryProgram, "boundary"},
         {&FluidSim::m_copyProgram, "copy"},
         {&FluidSim::m_clearProgram, "clear"},
-        {&FluidSim::m_globalGravityProgram, "global_gravity"}
+        {&FluidSim::m_globalGravityProgram, "global_gravity"},
+        {&FluidSim::m_seedProgram, "seed"}
     }};
 
     for (const auto &[program, name] : ProgramList)
@@ -214,15 +240,17 @@ void FluidSim::Compute(globjects::Program *const program)
     program->dispatchCompute(m_cubeDimensions[0] / WorkGroupSize[0], m_cubeDimensions[1] / WorkGroupSize[1], m_cubeDimensions[2] / WorkGroupSize[2]);
 }
 
-void FluidSim::SolvePoissonSystem(CStdSwappableTexture3D& swappableTexture, const CStdTexture3D& initialValue, const float alpha, const float beta)
+void FluidSim::SolvePoissonSystem(CStdSwappableTexture3D& swappableTexture, const CStdTexture3D& initialValue, const float alpha, const float beta, const bool isProject)
 {
     CopyImage(initialValue, m_temporaryTexture);
     m_jacobiProgram->setUniform("alpha", alpha);
     m_jacobiProgram->setUniform("beta", beta);
     BindImage(m_jacobiProgram, "fieldb_r", m_temporaryTexture, 0, GL_READ_ONLY);
-
-    for (std::size_t i{ 0 }; i < variables.NumJacobiRounds; ++i)
+    for (std::size_t i{ 0 }; i < (isProject ? variables.NumJacobiRounds : 1); ++i)
     {
+
+        SetBounds(swappableTexture, 1);
+
         BindImage(m_jacobiProgram, "fieldx_r", swappableTexture.GetFront(), 1, GL_READ_ONLY);
         BindImage(m_jacobiProgram, "field_out", swappableTexture.GetBack(), 2, GL_WRITE_ONLY);
         Compute(m_jacobiProgram);
@@ -244,7 +272,7 @@ void FluidSim::SetBounds(CStdSwappableTexture3D& texture, const float scale)
     BindImage(m_boundaryProgram, "field_r", texture.GetFront(), 0, GL_READ_ONLY);
     BindImage(m_boundaryProgram, "field_w", texture.GetBack(), 1, GL_WRITE_ONLY);
     Compute(m_boundaryProgram);
-    m_velocityTexture.SwapBuffers();
+    texture.SwapBuffers();
 }
 
 void FluidSim::DoDroplets()
