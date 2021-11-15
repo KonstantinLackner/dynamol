@@ -426,10 +426,10 @@ private:
 		static constexpr std::array<GLenum, 4> Formats{GL_RED, GL_RG, GL_RGB, GL_RGBA};
 		static constexpr std::array<std::array<GLenum, 2>, 4> InternalFormats
 		{{
-			{GL_R32F, GL_R16F},
-			{GL_RG32F, GL_RG16F},
-			{GL_RGB32F, GL_RGB16F},
-			{GL_RGBA32F, GL_RGBA16F}
+			{GL_R16F, GL_R32F},
+			{GL_RG16F, GL_RG32F},
+			{GL_RGB16F, GL_RGB32F},
+			{GL_RGBA16F, GL_RGBA32F}
 		}};
 		static constexpr std::array<GLenum, 4> InternalSnormFormats{GL_R16_SNORM, GL_RG16_SNORM, GL_RGB16_SNORM, GL_RGBA16_SNORM};
 		static constexpr auto Type = GL_FLOAT;
