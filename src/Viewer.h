@@ -47,6 +47,11 @@ namespace dynamol
 		glm::mat4 modelLightTransform() const;
 		glm::mat4 modelLightProjectionTransform() const;
 
+		glm::mat4 viewProjectionTransform() const;
+
+		glm::vec3 cameraPosition() const;
+		void setCameraPosition(const glm::vec3 &cameraPosition);
+
 		void saveImage(const std::string & filename);
 
 	private:
@@ -67,13 +72,14 @@ namespace dynamol
 
 		std::vector<std::unique_ptr<Interactor>> m_interactors;
 		std::vector<std::unique_ptr<Renderer>> m_renderers;
-		std::optional<FluidSim> m_fluidSim;
+		FluidSim *m_fluidSim;
 
 		glm::vec3 m_backgroundColor = glm::vec3(0.2f, 0.2f, 0.2f);
 		glm::mat4 m_modelTransform = glm::mat4(1.0f);
 		glm::mat4 m_viewTransform = glm::mat4(1.0f);
 		glm::mat4 m_lightTransform = glm::mat4(1.0f);
 		glm::mat4 m_projectionTransform = glm::mat4(1.0f);
+		glm::vec3 m_cameraPosition;
 
 		bool m_showUi = true;
 		bool m_saveScreenshot = false;

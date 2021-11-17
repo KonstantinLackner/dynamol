@@ -7,6 +7,7 @@
 
 #include <array>
 #include <memory>
+#include <variant>
 
 #include <glm/glm.hpp>
 #include <glbinding/gl/gl.h>
@@ -30,7 +31,7 @@
 
 namespace dynamol
 {
-    class FluidSim
+    class FluidSim : public Interactor
     {
     public:
         struct Variables
@@ -41,8 +42,10 @@ namespace dynamol
             float GlobalGravity{ 0.f };
             bool HasSeeded{ false };
             bool Boundaries{ true };
-            std::size_t NumJacobiRounds{ 40 };
-            //float ForceMultiplier{ 1.0f };
+            float ForceMultiplier{ 1.0f };
+
+            static constexpr std::size_t NumJacobiRounds{ 40 };
+            static constexpr std::size_t NumJacobiRoundsDiffusion{ 20 };
         };
 
     public:
@@ -53,7 +56,9 @@ namespace dynamol
         void Execute();
         GLuint GetDebugFramebufferTexture() const;
         const CStdTexture3D &GetVelocityTexture() const;
-        Variables &GetVariables() { return variables; }
+
+		virtual void mouseButtonEvent(int button, int action, int mods) override;
+        virtual void display() override;
 
     private:
         void LoadShaders();
@@ -67,7 +72,7 @@ namespace dynamol
 
     private:
         static constexpr std::array<int32_t, 3> WorkGroupSize{8, 8, 8};
-        Variables variables;
+        Variables m_variables;
         Renderer *m_renderer;
         std::array<std::int32_t, 2> m_windowDimensions;
         std::array<std::int32_t, 3> m_cubeDimensions;
@@ -75,6 +80,7 @@ namespace dynamol
 
         globjects::Program *m_borderProgram{nullptr};
         globjects::Program *m_addImpulseProgram{nullptr};
+        globjects::Program *m_addImpulseLineProgram{nullptr};
         globjects::Program *m_advectionProgram{nullptr};
         globjects::Program *m_jacobiProgram{nullptr};
         globjects::Program *m_divergenceProgram{nullptr};
@@ -97,7 +103,7 @@ namespace dynamol
         float m_gridScale;
         float m_splatRadius;
         float m_lastTime;
-        ImpulseState m_impulseState;
+        std::variant<std::monostate, ImpulseState, std::pair<glm::vec3, glm::vec3>> m_impulseState;
         GLuint m_frameCounter{0};
         GLuint m_frameTimeSum{0};
     };

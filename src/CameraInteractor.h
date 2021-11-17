@@ -21,7 +21,6 @@ namespace dynamol
 		void resetViewTransform();
 
 	private:
-
 		glm::vec3 arcballVector(double x, double y);
 
 		float m_fov = glm::radians(60.0f);

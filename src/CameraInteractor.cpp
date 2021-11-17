@@ -242,6 +242,8 @@ void CameraInteractor::cursorPosEvent(double xpos, double ypos)
 	m_xPrevious = m_xCurrent;
 	m_yPrevious = m_yCurrent;
 
+	viewer()->setCameraPosition(arcballVector(m_xCurrent, m_yCurrent));
+
 }
 
 void CameraInteractor::scrollEvent(double xoffset, double yoffset)

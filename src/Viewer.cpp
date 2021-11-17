@@ -62,7 +62,9 @@ Viewer::Viewer(GLFWwindow *window, Scene *scene) : m_window(window), m_scene(sce
 	const glm::vec3 &maxBounds{scene->protein()->maximumBounds()};
 	const std::array<std::int32_t, 3> cubeSize{maxBounds.x + 1 - minBounds.x, maxBounds.y + 1 - minBounds.y, maxBounds.z + 1 - minBounds.z};
 	//const std::array<std::int32_t, 3> cubeSize{256, 256, 256};
-	m_fluidSim.emplace(m_renderers.back().get(), std::array{width, height}, cubeSize);
+	
+	m_interactors.emplace_back(std::make_unique<FluidSim>(m_renderers.back().get(), std::array{width, height}, cubeSize));
+	m_fluidSim = static_cast<FluidSim *>(m_interactors.back().get());
 
 	m_renderers.emplace_back(std::make_unique<BoundingBoxRenderer>(this));
 
@@ -116,7 +118,7 @@ Scene* Viewer::scene()
 
 FluidSim* Viewer::fluidSim()
 {
-	return &m_fluidSim.value();
+	return m_fluidSim;
 }
 
 ivec2 Viewer::viewportSize() const
@@ -194,6 +196,21 @@ mat4 Viewer::modelLightTransform() const
 mat4 Viewer::modelLightProjectionTransform() const
 {
 	return projectionTransform()*modelLightTransform();
+}
+
+mat4 Viewer::viewProjectionTransform() const
+{
+	return projectionTransform() * viewTransform();
+}
+
+vec3 Viewer::cameraPosition() const
+{
+	return m_cameraPosition;
+}
+
+void Viewer::setCameraPosition(const glm::vec3 &cameraPosition)
+{
+	m_cameraPosition = cameraPosition;
 }
 
 void Viewer::saveImage(const std::string & filename)
@@ -463,24 +480,6 @@ void Viewer::mainMenu()
 			ImGui::EndMenu();
 		}
 
-		ImGui::EndMenu();
-	}
-
-	if (ImGui::BeginMenu("FluidSim")) {
-		auto &variables = m_fluidSim->GetVariables();
-		ImGui::ColorEdit3("Background", glm::value_ptr(m_backgroundColor));
-		ImGui::SliderFloat("Dissipation", &variables.Dissipation, 0.0f, 1.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
-		ImGui::SliderFloat("Gravity", &variables.Gravity, 0.0f, 30.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
-		ImGui::SliderFloat("Viscosity", &variables.Viscosity, 0.0001f, 1.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
-
-		static constexpr auto NumJacobiImGuiDataType = sizeof(std::size_t) == 8 ? ImGuiDataType_U64 : ImGuiDataType_U32;
-		static constexpr auto NumJacobiMin = 20;
-		static constexpr auto NumJacobiMax = 80;
-
-		ImGui::SliderScalar("NumJacobiRounds", NumJacobiImGuiDataType, &variables.NumJacobiRounds, &NumJacobiMin, &NumJacobiMax, "%zu", ImGuiSliderFlags_AlwaysClamp);
-		//ImGui::SliderFloat("ForceMultiplier", &resolutionScale, 0.1f, 10.0f);
-		ImGui::Checkbox("Boundaries", &variables.Boundaries);
-		ImGui::SliderFloat("Global Gravity", &variables.GlobalGravity, 0.f, 10.f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
 		ImGui::EndMenu();
 	}
 }
