@@ -60,20 +60,21 @@ void FluidSim::Execute()
 
     m_timerQuery->begin(GL_TIME_ELAPSED);
 
-/*
+
 #pragma region Seed
     BindImage(m_seedProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
     Compute(m_seedProgram);
     m_velocityTexture.SwapBuffers();
 #pragma endregion
-*/
+
+    /*
 #pragma region Bounds
     if (m_variables.Boundaries)
     {
         SetBounds(m_velocityTexture, -1);
     }
 #pragma endregion
-
+*/
 
 #pragma region Advection
     m_advectionProgram->setUniform("delta_t", m_dt);
@@ -87,13 +88,13 @@ void FluidSim::Execute()
     m_velocityTexture.SwapBuffers();
 #pragma endregion
 
-/*
+
 #pragma region Diffuse
     const float alpha{ (m_gridScale * m_gridScale) / (m_variables.Viscosity * m_dt) };
     const float beta{ 1.0f / (4.0f + alpha) };
     SolvePoissonSystem(m_velocityTexture, m_velocityTexture.GetFront(), alpha, beta, false);
 #pragma endregion
-*/
+
 
 #pragma region Impulse
     std::visit(Visitor{
@@ -136,25 +137,15 @@ void FluidSim::Execute()
 #pragma endregion
 */
 
-    /*
+
 #pragma region Projection
-    m_divergenceProgram->setUniform("gs", m_gridScale);
+    m_divergenceProgram->setUniform("gs", m_gridScale * 0.5f);
     BindImage(m_divergenceProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
     BindImage(m_divergenceProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
-    Compute(m_divergenceProgram);   
-
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-    m_pressureTexture.GetFront().Clear();
-
-#pragma region Bounds
-    if (m_variables.Boundaries)
-    {
-        SetBounds(m_pressureTexture, 1);
-    }
-#pragma endregion
+    Compute(m_divergenceProgram);
 
     // Solve for P in: Laplacian(P) = div(W)
-    SolvePoissonSystem(m_pressureTexture, m_velocityTexture.GetBack(), -1, 0.25f, true);
+    SolvePoissonSystem(m_pressureTexture, m_velocityTexture.GetBack(), -m_gridScale * m_gridScale, 0.25f, true); // Shouldn't this take velocity.Back.x as b?
 
     // Calculate grad(P)
     m_gradientProgram->setUniform("gs", m_gridScale);
@@ -162,13 +153,11 @@ void FluidSim::Execute()
     BindImage(m_gradientProgram, "field_w", m_pressureTexture.GetBack(), 1, GL_WRITE_ONLY);
     Compute(m_gradientProgram);
 
-    // No swap, back buffer has the gradient
-#pragma region Bounds
+
     if (m_variables.Boundaries)
     {
         SetBounds(m_velocityTexture, -1);
     }
-#pragma endregion
 
     // Calculate U = W - grad(P) where div(U)=0
     BindImage(m_subtractProgram, "a", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
@@ -177,7 +166,7 @@ void FluidSim::Execute()
     Compute(m_subtractProgram);
     m_velocityTexture.SwapBuffers();
 #pragma endregion
-*/
+
     // Transform feedback read
 #pragma region TimeTrack
     m_timerQuery->end(GL_TIME_ELAPSED);
@@ -329,13 +318,12 @@ void FluidSim::SolvePoissonSystem(CStdSwappableTexture3D& swappableTexture, cons
     m_jacobiProgram->setUniform("alpha", alpha);
     m_jacobiProgram->setUniform("beta", beta);
     BindImage(m_jacobiProgram, "fieldb_r", m_temporaryTexture, 0, GL_READ_ONLY);
+    BindImage(m_jacobiProgram, "fieldx_r", swappableTexture.GetFront(), 1, GL_READ_ONLY);
+    BindImage(m_jacobiProgram, "field_out", swappableTexture.GetBack(), 2, GL_WRITE_ONLY);
     for (std::size_t i{ 0 }; i < (isProject ? Variables::NumJacobiRounds : Variables::NumJacobiRoundsDiffusion); ++i)
     {
 
         SetBounds(swappableTexture, 1);
-
-        BindImage(m_jacobiProgram, "fieldx_r", swappableTexture.GetFront(), 1, GL_READ_ONLY);
-        BindImage(m_jacobiProgram, "field_out", swappableTexture.GetBack(), 2, GL_WRITE_ONLY);
         Compute(m_jacobiProgram);
         swappableTexture.SwapBuffers();
     }
@@ -368,7 +356,7 @@ void FluidSim::DoDroplets()
     if (acc >= nextDrop)
     {
         acc = 0;
-        static constexpr auto Delay = 1000.0f;
+        static constexpr auto Delay = 10.0f; // Should be 1000
         nextDrop = Delay + std::pow(-1, std::rand() % 2) * (std::rand() % static_cast<int>(0.5 * Delay));
         //LOG_INFO("Next drop: %.2f", next_drop);
 
@@ -377,6 +365,7 @@ void FluidSim::DoDroplets()
         impulseState.LastPos = randomPositions[0];
         impulseState.CurrentPos = randomPositions[1];
         impulseState.Delta = impulseState.CurrentPos - impulseState.LastPos;
+        globjects::debug() << impulseState.Delta.x << ',' << impulseState.Delta.y << ',' << impulseState.Delta.z << ',' <<'\n';
         impulseState.ForceActive = true;
         impulseState.InkActive = true;
         impulseState.Radial = true;

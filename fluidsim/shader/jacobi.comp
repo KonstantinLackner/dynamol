@@ -32,7 +32,7 @@ void main()
 
     vec4 center = imageLoad(fieldb_r, coord);
 
-    vec4 result = (left + right + top + bottom + front + back + (alpha * center)) / beta;
+    vec4 result = (left + right + top + bottom + front + back + alpha * center) * beta;
 
     imageStore(field_out, coord, result);
 }

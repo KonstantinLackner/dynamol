@@ -17,5 +17,5 @@ void main()
    //vec4 color = imageLoad(field, ivec3(vec3(vTex, depth)) * cubeSize);
 
    vec4 color = texture(sampler, vec3(vTex, depth));
-   FragColor = color / 2 + 0.5;
+   FragColor = color;
 };

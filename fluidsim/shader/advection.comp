@@ -30,21 +30,6 @@ ivec3 clamp_coord(ivec3 coord, ivec3 size)
     return clamp(coord, ivec3(0, 0, 0), size);
 }
 
-/*
-void advect_point(ivec3 coord)
-{
-    vec3 u1 = imageLoad(velocity, coord).xyz;
-
-    vec3 delta = delta_t * gs * u1;
-    ivec3 pos0 = clamp_coord(ivec3(coord - grid_clamp(delta)), imageSize(quantity_r));
-
-    vec4 u0 = dissipation * imageLoad(quantity_r, pos0);
-    u0 += vec4(0, -gravity, 0, 0);
-
-    imageStore(quantity_w, coord, u0);
-}
-*/
-
 void advect_point(ivec3 coord)
 {
     vec3 currentVelocity = imageLoad(velocity, coord).xyz;
@@ -62,6 +47,10 @@ void advect_point(ivec3 coord)
     
     vec4 u0 = (inFront + behind + above + under + left + right) / 6;
     u0 *= dissipation;
+
+    if (coord.x == 0 || coord.y == 0 || coord.z == 0) {
+        u0 = vec4(0, 0, 0, 0);
+    }
 
     //u0 += vec4(0, -gravity, 0, 0);
     imageStore(quantity_w, coord, u0);

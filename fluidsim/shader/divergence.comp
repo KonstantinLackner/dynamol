@@ -26,7 +26,7 @@ void main()
     vec4 front = imageLoad(field_r, clamp_coord(coord + ivec3(0,0,-1), imageSize(field_r)));
     vec4 back = imageLoad(field_r, clamp_coord(coord + ivec3(0,0,1), imageSize(field_r)));
     
-    float div = (right.x - left.x)/(2 * gs) + (top.y - bottom.y)/(2 * gs) + (back.z - front.z)/(2 * gs);
+    float div = gs * (right.x - left.x + top.y - bottom.y + back.z - front.z);
 
     imageStore(field_w, coord, vec4(div, 0, 0, 0));
 }

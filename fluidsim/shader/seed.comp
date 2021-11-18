@@ -11,7 +11,7 @@ void main()
 
 	if (coord.x == 50 && coord.y == 50)
 	{
-		vec4 value = vec4(1, 0, 0, 0);
+		vec4 value = vec4(100, 100, 100, 0);
 		imageStore(field_w, coord, value);
 	}
 }
