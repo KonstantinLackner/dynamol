@@ -72,15 +72,11 @@ std::unique_ptr<Texture> loadTexture(const std::string& filename)
 	return std::unique_ptr<Texture>();
 }
 
-SphereRenderer::SphereRenderer(Viewer* viewer) : Renderer(viewer)
+SphereRenderer::SphereRenderer(Viewer* viewer) : Renderer(viewer), Interactor{viewer}
 {
 	Shader::hintIncludeImplementation(Shader::IncludeImplementation::Fallback);
 
-	for (auto i : viewer->scene()->protein()->atoms())
-	{
-		m_vertices.push_back(Buffer::create());
-		m_vertices.back()->setStorage(i, gl::GL_NONE_BIT);
-	}
+	initBuffers();
 
 	m_elementColorsRadii->setStorage(viewer->scene()->protein()->activeElementColorsRadiiPacked(), gl::GL_NONE_BIT);
 	m_residueColors->setStorage(viewer->scene()->protein()->activeResidueColorsPacked(), gl::GL_NONE_BIT);
@@ -356,9 +352,6 @@ SphereRenderer::SphereRenderer(Viewer* viewer) : Renderer(viewer)
 
 	m_transformFeedback.reset(new TransformFeedback());
 	m_transformFeedback->setVaryings(shaderProgram("transformfeedback"), {"gCoords"}, GL_INTERLEAVED_ATTRIBS);
-
-	m_transformedCoordinates = Buffer::create();
-	m_transformedCoordinates->setStorage(viewer->scene()->protein()->atoms()[0].size() * sizeof(glm::vec4), nullptr, GL_NONE_BIT);
 }
 
 void SphereRenderer::display()
@@ -1158,4 +1151,36 @@ void SphereRenderer::display()
 
 	// Restore OpenGL state
 	currentState->apply();
+}
+
+void SphereRenderer::mouseButtonEvent(const int button, const int action, const int mods)
+{
+	if (button != GLFW_MOUSE_BUTTON_RIGHT || action != GLFW_PRESS) return;
+
+	double x;
+	double y;
+	glfwGetCursorPos(viewer()->window(), &x, &y);
+	// TODO: camera matrix handling
+
+	addPoint(x, y);
+}
+
+void SphereRenderer::addPoint(const double x, const double y)
+{
+	viewer()->scene()->protein()->addAtom({x, y, 300.0, 0});
+
+	initBuffers();
+}
+
+void SphereRenderer::initBuffers()
+{
+	m_vertices.clear();
+	for (const auto &i : viewer()->scene()->protein()->atoms())
+	{
+		m_vertices.push_back(Buffer::create());
+		m_vertices.back()->setStorage(i, gl::GL_NONE_BIT);
+	}
+
+	m_transformedCoordinates = Buffer::create();
+	m_transformedCoordinates->setStorage(viewer()->scene()->protein()->atoms()[0].size() * sizeof(glm::vec4), nullptr, GL_NONE_BIT);
 }

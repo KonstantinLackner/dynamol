@@ -38,6 +38,8 @@ FluidSim::FluidSim(Renderer *const renderer, const std::array<std::int32_t, 2> &
       m_splatRadius{cubeDimensions[0] * 0.37f},
       m_dt{0},
       m_lastTime{0},
+      m_mouseButtonPressed{false},
+      m_wantsMouseInput{false},
       m_frameCounter{0},
       m_frameTimeSum{0}
 {
@@ -56,17 +58,17 @@ void FluidSim::Execute()
     const double now{glfwGetTime()};
     m_dt = m_lastTime == 0 ? 0.016667 : now - m_lastTime;
     m_lastTime = now;
-    //DoDroplets();
+    DoDroplets();
 
     m_timerQuery->begin(GL_TIME_ELAPSED);
 
-
+/*
 #pragma region Seed
     BindImage(m_seedProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
     Compute(m_seedProgram);
     m_velocityTexture.SwapBuffers();
 #pragma endregion
-
+*/
     /*
 #pragma region Bounds
     if (m_variables.Boundaries)
@@ -88,15 +90,48 @@ void FluidSim::Execute()
     m_velocityTexture.SwapBuffers();
 #pragma endregion
 
-
+    /*
 #pragma region Diffuse
     const float alpha{ (m_gridScale * m_gridScale) / (m_variables.Viscosity * m_dt) };
     const float beta{ 1.0f / (4.0f + alpha) };
     SolvePoissonSystem(m_velocityTexture, m_velocityTexture.GetFront(), alpha, beta, false);
 #pragma endregion
-
+*/
 
 #pragma region Impulse
+
+    if (m_mouseButtonPressed)
+    {
+        Viewer *const viewer{m_renderer->viewer()};
+        double x;
+        double y;
+        glfwGetCursorPos(viewer->window(), &x, &y);
+        y = m_windowDimensions[1] - y;
+
+        const auto halfWindowWidth = static_cast<double>(m_windowDimensions[0]) / 2;
+        const auto halfWindowHeight = static_cast<double>(m_windowDimensions[1]) / 2;
+
+        const glm::vec4 screenCoords{
+            static_cast<float>((x - halfWindowWidth) / halfWindowWidth),
+            static_cast<float>((y - halfWindowHeight) / halfWindowWidth),
+            -2,
+            1
+            };
+
+        glm::vec4 pickCoords{glm::inverse(viewer->viewProjectionTransform()) * screenCoords};
+        pickCoords /= pickCoords.w;
+
+        const glm::vec3 cameraPosition{viewer->cameraPosition()};
+        const auto delta = glm::vec3{pickCoords.x, pickCoords.y, pickCoords.z} - cameraPosition;
+        const auto direction = glm::normalize(delta);
+
+        if (const auto intersections = Raycast::GetLineIntersectionsWithBox(cameraPosition, direction); intersections)
+        {
+            const glm::vec3 cubeSize{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2]};
+            m_impulseState.emplace<2>(std::make_pair((intersections->first + 0.5f) * cubeSize, (intersections->second + 0.5f) * cubeSize));
+        }
+    }
+
     std::visit(Visitor{
         [this](const ImpulseState &impulseState)
         {
@@ -115,9 +150,9 @@ void FluidSim::Execute()
             m_addImpulseLineProgram->setUniform("end", impulseLine.second);
             m_addImpulseLineProgram->setUniform("cameraPosition", m_renderer->viewer()->cameraPosition());
             m_addImpulseLineProgram->setUniform("forceMultiplier", m_variables.ForceMultiplier);
-            BindImage(m_addImpulseProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
-            BindImage(m_addImpulseProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
-            Compute(m_addImpulseProgram);
+            BindImage(m_addImpulseLineProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
+            BindImage(m_addImpulseLineProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
+            Compute(m_addImpulseLineProgram);
             m_velocityTexture.SwapBuffers();
         },
         [this](std::monostate) {}
@@ -137,22 +172,25 @@ void FluidSim::Execute()
 #pragma endregion
 */
 
-
+    /*
 #pragma region Projection
     m_divergenceProgram->setUniform("gs", m_gridScale * 0.5f);
     BindImage(m_divergenceProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
     BindImage(m_divergenceProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
     Compute(m_divergenceProgram);
+    
+    //pressuretexture nullsetzen
+    m_pressureTexture.GetFront().Clear();
+    m_pressureTexture.GetBack().Clear();
 
-    // Solve for P in: Laplacian(P) = div(W)
+    // Pressurefield from which gradient is calculated
     SolvePoissonSystem(m_pressureTexture, m_velocityTexture.GetBack(), -m_gridScale * m_gridScale, 0.25f, true); // Shouldn't this take velocity.Back.x as b?
-
+    
     // Calculate grad(P)
     m_gradientProgram->setUniform("gs", m_gridScale);
     BindImage(m_gradientProgram, "field_r", m_pressureTexture.GetFront(), 0, GL_READ_ONLY);
     BindImage(m_gradientProgram, "field_w", m_pressureTexture.GetBack(), 1, GL_WRITE_ONLY);
     Compute(m_gradientProgram);
-
 
     if (m_variables.Boundaries)
     {
@@ -166,7 +204,7 @@ void FluidSim::Execute()
     Compute(m_subtractProgram);
     m_velocityTexture.SwapBuffers();
 #pragma endregion
-
+*/
     // Transform feedback read
 #pragma region TimeTrack
     m_timerQuery->end(GL_TIME_ELAPSED);
@@ -184,12 +222,13 @@ void FluidSim::Execute()
 #pragma endregion
 
 #pragma region Render
+    // Zu Debugmethode um dann dami zu prüfen, ob bspw. divergence 0, oder wie die einzelnen werte ausschauenS
     m_debugFramebuffer.Bind();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     m_renderPlaneProgram->use();
     m_velocityTexture.Bind(0);
-    m_renderPlaneProgram->setUniform("sampler", 0);
-    m_renderPlaneProgram->setUniform("depth", 5.0f);
+    m_renderPlaneProgram->setUniform("depth", static_cast<float>(m_variables.DebugFramebuffer.Depth));
+    m_renderPlaneProgram->setUniform("range", m_variables.DebugFramebuffer.Range);
     m_quad.Bind();
 
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -210,36 +249,13 @@ const CStdTexture3D &FluidSim::GetVelocityTexture() const
 
 void FluidSim::mouseButtonEvent(const int button, const int action, const int mods)
 {
-    if (button != GLFW_MOUSE_BUTTON_LEFT || action != GLFW_PRESS) return;
+    if (button != GLFW_MOUSE_BUTTON_LEFT) return;
+    m_mouseButtonPressed = action == GLFW_PRESS;
+}
 
-    Viewer *const viewer{m_renderer->viewer()};
-    double x;
-    double y;
-    glfwGetCursorPos(viewer->window(), &x, &y);
-    y = m_windowDimensions[1] - y;
-
-    const auto halfWindowWidth = static_cast<double>(m_windowDimensions[0]) / 2;
-    const auto halfWindowHeight = static_cast<double>(m_windowDimensions[1]) / 2;
-
-    const glm::vec4 screenCoords{
-        static_cast<float>((x - halfWindowWidth) / halfWindowWidth),
-        static_cast<float>((y - halfWindowHeight) / halfWindowWidth),
-        -2,
-        1
-        };
-
-    glm::vec4 pickCoords{glm::inverse(viewer->viewProjectionTransform()) * screenCoords};
-    pickCoords /= pickCoords.w;
-
-    const glm::vec3 cameraPosition{viewer->cameraPosition()};
-    const auto delta = glm::vec3{pickCoords.x, pickCoords.y, pickCoords.z} - cameraPosition;
-    const auto direction = glm::normalize(delta);
-
-    if (const auto intersections = Raycast::GetLineIntersectionsWithBox(cameraPosition, direction); intersections)
-    {
-        const glm::vec3 cubeSize{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2]};
-        m_impulseState.emplace<2>(std::make_pair((intersections->first + 0.5f) * cubeSize, (intersections->second + 0.5f) * cubeSize));
-    }
+void FluidSim::cursorPosEvent(const double x, const double y)
+{
+    //m_mouseButtonPressed = WantsMouseInput() && glfwGetMouseButton(m_renderer->viewer()->window(), GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
 }
 
 void FluidSim::display()
@@ -254,6 +270,13 @@ void FluidSim::display()
 		ImGui::SliderFloat("ForceMultiplier", &m_variables.ForceMultiplier, 0.1f, 10.0f);
 		ImGui::Checkbox("Boundaries", &m_variables.Boundaries);
 		ImGui::SliderFloat("Global Gravity", &m_variables.GlobalGravity, 0.f, 10.f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+
+        ImGui::Separator();
+        ImGui::SliderInt("Depth", &m_variables.DebugFramebuffer.Depth, 0, m_cubeDimensions[2] - 1, "%d", ImGuiSliderFlags_AlwaysClamp);
+        ImGui::DragFloatRange2("Range", &m_variables.DebugFramebuffer.Range.x, &m_variables.DebugFramebuffer.Range.y, 1.0f, -10.0f, 10.0f, "%.3f", nullptr, ImGuiSliderFlags_AlwaysClamp);
+
+        //ImGui::Separator();
+        //ImGui::Checkbox("Mouse input", &m_wantsMouseInput);
 		ImGui::EndMenu();
 	}
 }
@@ -318,12 +341,16 @@ void FluidSim::SolvePoissonSystem(CStdSwappableTexture3D& swappableTexture, cons
     m_jacobiProgram->setUniform("alpha", alpha);
     m_jacobiProgram->setUniform("beta", beta);
     BindImage(m_jacobiProgram, "fieldb_r", m_temporaryTexture, 0, GL_READ_ONLY);
-    BindImage(m_jacobiProgram, "fieldx_r", swappableTexture.GetFront(), 1, GL_READ_ONLY);
-    BindImage(m_jacobiProgram, "field_out", swappableTexture.GetBack(), 2, GL_WRITE_ONLY);
     for (std::size_t i{ 0 }; i < (isProject ? Variables::NumJacobiRounds : Variables::NumJacobiRoundsDiffusion); ++i)
     {
 
-        SetBounds(swappableTexture, 1);
+        if (isProject) {
+            SetBounds(swappableTexture, 1);
+        }
+
+        BindImage(m_jacobiProgram, "fieldx_r", swappableTexture.GetFront(), 1, GL_READ_ONLY);
+        BindImage(m_jacobiProgram, "field_out", swappableTexture.GetBack(), 2, GL_WRITE_ONLY);
+
         Compute(m_jacobiProgram);
         swappableTexture.SwapBuffers();
     }
@@ -365,7 +392,7 @@ void FluidSim::DoDroplets()
         impulseState.LastPos = randomPositions[0];
         impulseState.CurrentPos = randomPositions[1];
         impulseState.Delta = impulseState.CurrentPos - impulseState.LastPos;
-        globjects::debug() << impulseState.Delta.x << ',' << impulseState.Delta.y << ',' << impulseState.Delta.z << ',' <<'\n';
+        //globjects::debug() << impulseState.Delta.x << ',' << impulseState.Delta.y << ',' << impulseState.Delta.z << ',' <<'\n';
         impulseState.ForceActive = true;
         impulseState.InkActive = true;
         impulseState.Radial = true;

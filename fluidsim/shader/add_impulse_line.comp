@@ -38,15 +38,15 @@ void impulse_line(ivec3 coord)
 
     x = -x / radius;
 
-    vec4 effect = vec4(forceMultiplier * vec3(1.0) * exp(x), 1.0);
+    vec3 effect = vec3(1.0) * forceMultiplier * exp(x);
 
     vec4 u0 = imageLoad(field_r, coord);
-    vec4 summed = u0 + effect;
+    vec4 summed = u0 + vec4(effect, 0);
     imageStore(field_w, coord, summed);
 }
 
 void main()
 {
     ivec3 coord = ivec3(gl_GlobalInvocationID);
-    impulse_point(coord);
+    impulse_line(coord);
 }

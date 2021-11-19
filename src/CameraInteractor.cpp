@@ -118,10 +118,13 @@ void CameraInteractor::keyEvent(int key, int scancode, int action, int mods)
 		m_startTime = glfwGetTime();
 		m_frameCount = 0;
 	}
+
 }
 
 void CameraInteractor::mouseButtonEvent(int button, int action, int mods)
 {
+	//if (viewer()->fluidSim()->WantsMouseInput()) return;
+
 	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
 	{
 		m_rotating = true;
@@ -150,6 +153,8 @@ void CameraInteractor::mouseButtonEvent(int button, int action, int mods)
 
 void CameraInteractor::cursorPosEvent(double xpos, double ypos)
 {
+	//if (viewer()->fluidSim()->WantsMouseInput()) return;
+
 	m_xCurrent = xpos;
 	m_yCurrent = ypos;
 
@@ -248,6 +253,7 @@ void CameraInteractor::cursorPosEvent(double xpos, double ypos)
 
 void CameraInteractor::scrollEvent(double xoffset, double yoffset)
 {
+	//if (viewer()->fluidSim()->WantsMouseInput()) return;
 	mat4 viewTransform = viewer()->viewTransform();
 	mat4 newViewTransform = translate(mat4(1.0), vec3(0.0f, 0.0f, (yoffset / 8.0)))*viewTransform;
 	viewer()->setViewTransform(newViewTransform);

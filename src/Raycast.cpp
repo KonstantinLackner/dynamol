@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <iostream>
 #include <limits>
 
 std::optional<std::pair<glm::vec3, glm::vec3>> Raycast::GetLineIntersectionsWithBox(const glm::vec3 &point, const glm::vec3 &direction)
@@ -19,7 +20,8 @@ std::optional<std::pair<glm::vec3, glm::vec3>> Raycast::GetLineIntersectionsWith
 			intersections[count++] = *currentIntersection; \
 			if (count == 2) \
 			{ \
-				if (glm::length(point - intersections[0]) <= glm::length(point - intersections[1])) \
+				std::cout << "Match: " << _a << ' ' << _b << ' ' << _c << ' ' << _d << std::endl; \
+				if (glm::length(point - intersections[0]) < glm::length(point - intersections[1])) \
 				{ \
 					return {{intersections[0], intersections[1]}}; \
 				} \
@@ -55,7 +57,7 @@ std::optional<glm::vec3> Raycast::GetLineIntersectionWithRectangle(const glm::ve
 	}
 
 	const auto u = topLeft - topRight;
-	const auto v = topLeft - bottomRight;
+	const auto v = topLeft - bottomLeft;
 	const auto dotu = glm::dot(u, *x);
 	const auto dotv = glm::dot(v, *x);
 	const auto dotuTopLeft = glm::dot(u, topLeft);
@@ -90,13 +92,13 @@ std::optional<glm::vec3> Raycast::GetLineIntersectionWithPlane(const glm::vec3 &
 	static constexpr auto Epsilon = std::numeric_limits<glm::vec3::value_type>::epsilon();
 
 	const auto numerator = glm::dot(planePoint - point, planeNormal);
-	if (std::abs(numerator) < Epsilon) // Line is on the plane
+	if (std::abs(numerator) <= Epsilon) // Line is on the plane
 	{
 		return {};
 	}
 
 	const auto denominator = glm::dot(direction, planeNormal);
-	if (std::abs(denominator) < Epsilon) // Line is parallel to plane
+	if (std::abs(denominator) <= Epsilon) // Line is parallel to plane
 	{
 		return {};
 	}

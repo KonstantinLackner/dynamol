@@ -62,7 +62,7 @@ Viewer::Viewer(GLFWwindow *window, Scene *scene) : m_window(window), m_scene(sce
 	const glm::vec3 &maxBounds{scene->protein()->maximumBounds()};
 	const std::array<std::int32_t, 3> cubeSize{maxBounds.x + 1 - minBounds.x, maxBounds.y + 1 - minBounds.y, maxBounds.z + 1 - minBounds.z};
 	//const std::array<std::int32_t, 3> cubeSize{256, 256, 256};
-	
+
 	m_interactors.emplace_back(std::make_unique<FluidSim>(m_renderers.back().get(), std::array{width, height}, cubeSize));
 	m_fluidSim = static_cast<FluidSim *>(m_interactors.back().get());
 
@@ -309,6 +309,14 @@ void Viewer::mouseButtonCallback(GLFWwindow* window, int button, int action, int
 		for (auto& i : viewer->m_interactors)
 		{
 			i->mouseButtonEvent(button, action, mods);
+		}
+
+		for (auto &i : viewer->m_renderers)
+		{
+			if (auto *const interactor{dynamic_cast<Interactor *>(i.get())}; interactor)
+			{
+				interactor->mouseButtonEvent(button, action, mods);
+			}
 		}
 	}
 }

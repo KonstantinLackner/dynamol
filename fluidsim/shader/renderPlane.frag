@@ -5,17 +5,18 @@ out vec4 FragColor;
 /*layout(rgba16_snorm) 
 uniform image3D field;*/
 
-uniform sampler3D sampler;
+layout(binding = 0) uniform sampler3D sampler;
 
 uniform float depth;
+uniform vec2 range;
 //uniform ivec3 cubeSize;
 
 in vec2 vTex;
 
 void main()
 {
-   //vec4 color = imageLoad(field, ivec3(vec3(vTex, depth)) * cubeSize);
+   vec3 color = texture(sampler, vec3(vTex, depth)).rgb;
+   vec3 mapped = (color - range.x) / (range.y - range.x);
 
-   vec4 color = texture(sampler, vec3(vTex, depth));
-   FragColor = color;
+   FragColor = vec4(mapped, 1.0);
 };

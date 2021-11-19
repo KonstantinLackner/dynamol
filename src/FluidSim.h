@@ -44,6 +44,12 @@ namespace dynamol
             bool Boundaries{ true };
             float ForceMultiplier{ 1.0f };
 
+            struct
+            {
+                std::int32_t Depth{ 0 };
+                glm::vec2 Range { -10.0f, 10.0f };
+            } DebugFramebuffer;
+
             static constexpr std::size_t NumJacobiRounds{ 40 };
             static constexpr std::size_t NumJacobiRoundsDiffusion{ 20 };
         };
@@ -56,8 +62,10 @@ namespace dynamol
         void Execute();
         GLuint GetDebugFramebufferTexture() const;
         const CStdTexture3D &GetVelocityTexture() const;
+        bool WantsMouseInput() const { return m_wantsMouseInput; }
 
 		virtual void mouseButtonEvent(int button, int action, int mods) override;
+        virtual void cursorPosEvent(double x, double y) override;
         virtual void display() override;
 
     private:
@@ -104,7 +112,9 @@ namespace dynamol
         float m_splatRadius;
         float m_lastTime;
         std::variant<std::monostate, ImpulseState, std::pair<glm::vec3, glm::vec3>> m_impulseState;
-        GLuint m_frameCounter{0};
-        GLuint m_frameTimeSum{0};
+        bool m_mouseButtonPressed;
+        bool m_wantsMouseInput;
+        GLuint m_frameCounter;
+        GLuint m_frameTimeSum;
     };
 }

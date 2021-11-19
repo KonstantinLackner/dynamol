@@ -1,4 +1,5 @@
 #pragma once
+#include "Interactor.h"
 #include "Renderer.h"
 #include <memory>
 
@@ -25,13 +26,21 @@ namespace dynamol
 {
 	class Viewer;
 
-	class SphereRenderer : public Renderer
+	class SphereRenderer : public Renderer, public Interactor
 	{
 	public:
 		SphereRenderer(Viewer *viewer);
+
+		using Renderer::viewer;
+		using Renderer::display;
 		virtual void display();
 
+		virtual void mouseButtonEvent(int button, int action, int mods);
+
+		void addPoint(double x, double y);
+
 	private:
+		void initBuffers();
 		
 		std::vector< std::unique_ptr<globjects::Buffer> > m_vertices;
 		std::unique_ptr<globjects::VertexArray> m_vao = std::make_unique<globjects::VertexArray>();
