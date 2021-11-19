@@ -41,7 +41,8 @@ FluidSim::FluidSim(Renderer *const renderer, const std::array<std::int32_t, 2> &
       m_mouseButtonPressed{false},
       m_wantsMouseInput{false},
       m_frameCounter{0},
-      m_frameTimeSum{0}
+      m_frameTimeSum{0},
+      m_captureState{false}
 {
     LoadShaders();
     m_debugFramebuffer.Bind();
@@ -90,13 +91,16 @@ void FluidSim::Execute()
     m_velocityTexture.SwapBuffers();
 #pragma endregion
 
-    /*
+    
 #pragma region Diffuse
     const float alpha{ (m_gridScale * m_gridScale) / (m_variables.Viscosity * m_dt) };
     const float beta{ 1.0f / (4.0f + alpha) };
     SolvePoissonSystem(m_velocityTexture, m_velocityTexture.GetFront(), alpha, beta, false);
 #pragma endregion
-*/
+    if (m_captureState) {
+        DebugPrint(m_velocityTexture.GetFront(), 0);
+        m_captureState = false;
+    }
 
 #pragma region Impulse
 
@@ -172,13 +176,13 @@ void FluidSim::Execute()
 #pragma endregion
 */
 
-    /*
+
 #pragma region Projection
     m_divergenceProgram->setUniform("gs", m_gridScale * 0.5f);
     BindImage(m_divergenceProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
     BindImage(m_divergenceProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
     Compute(m_divergenceProgram);
-    
+      
     //pressuretexture nullsetzen
     m_pressureTexture.GetFront().Clear();
     m_pressureTexture.GetBack().Clear();
@@ -204,7 +208,7 @@ void FluidSim::Execute()
     Compute(m_subtractProgram);
     m_velocityTexture.SwapBuffers();
 #pragma endregion
-*/
+
     // Transform feedback read
 #pragma region TimeTrack
     m_timerQuery->end(GL_TIME_ELAPSED);
@@ -222,7 +226,7 @@ void FluidSim::Execute()
 #pragma endregion
 
 #pragma region Render
-    // Zu Debugmethode um dann dami zu prüfen, ob bspw. divergence 0, oder wie die einzelnen werte ausschauenS
+    // Zu Debugmethode um dann damit zu prüfen, ob bspw. divergence 0, oder wie die einzelnen werte ausschauenS
     m_debugFramebuffer.Bind();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     m_renderPlaneProgram->use();
@@ -237,6 +241,30 @@ void FluidSim::Execute()
 #pragma endregion
 }
 
+void FluidSim::DebugPrint(const CStdTexture3D &texture, const GLuint depth)
+{
+    const auto layer = texture.GetTextureImage(depth);
+    const auto &dimensions = texture.GetDimensions();
+
+    for (std::int32_t y{0}; y < dimensions[1]; ++y)
+    {
+        for (std::int32_t x{0}; x < dimensions[0]; ++x)
+        {
+            for (std::int32_t c{0}; c < 4; ++c)
+            {
+                std::cout << *(layer.get() + y * dimensions[1] + x * dimensions[0] + c) << ' ';
+            }
+
+            std::cout << " | ";
+        }
+
+        std::cout << '\n';
+    }
+
+    std::cout << std::endl;
+}
+
+
 GLuint FluidSim::GetDebugFramebufferTexture() const
 {
     return m_debugFramebuffer.GetTexture().GetTexture();
@@ -245,6 +273,14 @@ GLuint FluidSim::GetDebugFramebufferTexture() const
 const CStdTexture3D &FluidSim::GetVelocityTexture() const
 {
     return m_velocityTexture.GetFront();
+}
+
+void FluidSim::keyEvent(const int key, const int scancode, const int action, const int mods)
+{
+    if (key == GLFW_KEY_F10 && action == GLFW_RELEASE)
+    {
+        m_captureState = true;
+    }
 }
 
 void FluidSim::mouseButtonEvent(const int button, const int action, const int mods)
@@ -265,7 +301,7 @@ void FluidSim::display()
 		//ImGui::ColorEdit3("Background", glm::value_ptr(m_backgroundColor));
 		ImGui::SliderFloat("Dissipation", &m_variables.Dissipation, 0.0f, 1.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
 		ImGui::SliderFloat("Gravity", &m_variables.Gravity, 0.0f, 30.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
-		ImGui::SliderFloat("Viscosity", &m_variables.Viscosity, 0.0001f, 1.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+		ImGui::SliderFloat("Viscosity", &m_variables.Viscosity, 0.0001f, 10.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
 
 		ImGui::SliderFloat("ForceMultiplier", &m_variables.ForceMultiplier, 0.1f, 10.0f);
 		ImGui::Checkbox("Boundaries", &m_variables.Boundaries);

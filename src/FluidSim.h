@@ -64,6 +64,7 @@ namespace dynamol
         const CStdTexture3D &GetVelocityTexture() const;
         bool WantsMouseInput() const { return m_wantsMouseInput; }
 
+        virtual void keyEvent(int key, int scancode, int action, int mods) override;
 		virtual void mouseButtonEvent(int button, int action, int mods) override;
         virtual void cursorPosEvent(double x, double y) override;
         virtual void display() override;
@@ -76,6 +77,7 @@ namespace dynamol
         void CopyImage(const CStdTexture3D &source, CStdTexture3D &destination);
         void SetBounds(CStdSwappableTexture3D &texture, float scale);
         void DoDroplets();
+        void DebugPrint(const CStdTexture3D &texture, GLuint depth);
         glm::vec3 RandomPosition() const;
 
     private:
@@ -116,5 +118,6 @@ namespace dynamol
         bool m_wantsMouseInput;
         GLuint m_frameCounter;
         GLuint m_frameTimeSum;
+        bool m_captureState;
     };
 }

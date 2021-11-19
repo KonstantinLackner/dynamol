@@ -9,6 +9,7 @@ using namespace gl;
 #include <glm/gtc/type_ptr.hpp>
 
 #include <array>
+#include <memory>
 #include <string_view>
 #include <unordered_map>
 
@@ -359,6 +360,8 @@ public:
 
 	GLuint GetTexture() const { return texture; }
 
+	const std::array<std::int32_t, Dimensions> &GetDimensions() const { return dimensions; }
+
 protected:
 	GLuint texture{GL_NONE};
 	std::array<std::int32_t, Dimensions> dimensions;
@@ -421,6 +424,8 @@ public:
 
 public:
 	void BindImage(GLuint unit, GLenum access) const;
+
+	std::unique_ptr<float[]> GetTextureImage(GLuint depth) const;
 
 private:
 		static constexpr std::array<GLenum, 4> Formats{GL_RED, GL_RG, GL_RGB, GL_RGBA};

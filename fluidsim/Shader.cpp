@@ -346,6 +346,13 @@ void CStdTexture3D::BindImage(GLuint unit, GLenum access) const
 	glBindImageTexture(unit, texture, 0, GL_TRUE, 0, access, internalFormat);
 }
 
+std::unique_ptr<float[]> CStdTexture3D::GetTextureImage(const GLuint depth) const
+{
+	auto result = std::make_unique<float[]>(dimensions[0] * dimensions[1] * 4);
+	glGetTextureSubImage(texture, 0, 0, 0, depth, dimensions[0], dimensions[1], 1, format, type, dimensions[0] * dimensions[1] * sizeof(float) * 4, result.get());
+	return result;
+}
+
 CStdFramebuffer::CStdFramebuffer(const std::int32_t width, const std::int32_t height)
 	: colorAttachment{{width, height}, InternalFormat, Format, Type}
 {
