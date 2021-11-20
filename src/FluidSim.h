@@ -40,6 +40,7 @@ namespace dynamol
             float Gravity{ 8.0f };
             float Viscosity{ 0.0004 };
             float GlobalGravity{ 0.f };
+            float ForceMulti{ 1.f };
             bool HasSeeded{ false };
             bool Boundaries{ true };
             float ForceMultiplier{ 1.0f };

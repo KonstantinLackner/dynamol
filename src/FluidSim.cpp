@@ -63,7 +63,7 @@ void FluidSim::Execute()
 
     m_timerQuery->begin(GL_TIME_ELAPSED);
 
-/*
+    /*
 #pragma region Seed
     BindImage(m_seedProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
     Compute(m_seedProgram);
@@ -78,6 +78,12 @@ void FluidSim::Execute()
     }
 #pragma endregion
 */
+    /*
+        Debug Advection
+        */
+    if (m_captureState) {
+        std::cout << "Now Advection" << std::endl;
+    }
 
 #pragma region Advection
     m_advectionProgram->setUniform("delta_t", m_dt);
@@ -91,15 +97,26 @@ void FluidSim::Execute()
     m_velocityTexture.SwapBuffers();
 #pragma endregion
 
+    /*
+        Debug Advection
+    */
+    if (m_captureState) {
+        DebugPrint(m_velocityTexture.GetFront(), 50);
+        std::cout << "Now Diffuse" << std::endl;
+    }
     
 #pragma region Diffuse
     const float alpha{ (m_gridScale * m_gridScale) / (m_variables.Viscosity * m_dt) };
     const float beta{ 1.0f / (4.0f + alpha) };
     SolvePoissonSystem(m_velocityTexture, m_velocityTexture.GetFront(), alpha, beta, false);
 #pragma endregion
+
+    /*
+        Debug Diffuse
+    */
     if (m_captureState) {
-        DebugPrint(m_velocityTexture.GetFront(), 0);
-        m_captureState = false;
+        DebugPrint(m_velocityTexture.GetFront(), 50);
+        std::cout << "Now Impulse" << std::endl;
     }
 
 #pragma region Impulse
@@ -141,6 +158,7 @@ void FluidSim::Execute()
         {
             m_addImpulseProgram->setUniform("position", impulseState.CurrentPos);
             m_addImpulseProgram->setUniform("radius", m_splatRadius);
+            m_addImpulseProgram->setUniform("forceMulti", m_variables.ForceMulti);
             m_addImpulseProgram->setUniform("force", glm::vec4{ impulseState.Delta, 0 });
             BindImage(m_addImpulseProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
             BindImage(m_addImpulseProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
@@ -166,6 +184,14 @@ void FluidSim::Execute()
 
 #pragma endregion
 
+    /*
+        Debug Impulse
+    */
+    if (m_captureState) {
+        DebugPrint(m_velocityTexture.GetFront(), 50);
+        std::cout << "Now Divergence" << std::endl;
+    }
+
 /*
 #pragma region Gravity
     m_globalGravityProgram->setUniform("gravity", m_variables.GlobalGravity);
@@ -182,6 +208,14 @@ void FluidSim::Execute()
     BindImage(m_divergenceProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
     BindImage(m_divergenceProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
     Compute(m_divergenceProgram);
+
+    /*
+        Debug Divergence
+    */
+    if (m_captureState) {
+        DebugPrint(m_velocityTexture.GetFront(), 50);
+        std::cout << "Now Pressurefield (pressureTexture.GetFront())" << std::endl;
+    }
       
     //pressuretexture nullsetzen
     m_pressureTexture.GetFront().Clear();
@@ -190,15 +224,39 @@ void FluidSim::Execute()
     // Pressurefield from which gradient is calculated
     SolvePoissonSystem(m_pressureTexture, m_velocityTexture.GetBack(), -m_gridScale * m_gridScale, 0.25f, true); // Shouldn't this take velocity.Back.x as b?
     
+    /*
+        Debug Pressurefield
+    */
+    if (m_captureState) {
+        DebugPrint(m_pressureTexture.GetFront(), 50);
+        std::cout << "Now Gradient" << std::endl;
+    }
+
     // Calculate grad(P)
     m_gradientProgram->setUniform("gs", m_gridScale);
     BindImage(m_gradientProgram, "field_r", m_pressureTexture.GetFront(), 0, GL_READ_ONLY);
     BindImage(m_gradientProgram, "field_w", m_pressureTexture.GetBack(), 1, GL_WRITE_ONLY);
     Compute(m_gradientProgram);
 
+    /*
+        Debug Gradient
+    */
+    if (m_captureState) {
+        DebugPrint(m_pressureTexture.GetFront(), 50);
+        std::cout << "Now Boundaries (velocityTexture.GetFront())" << std::endl;
+    }
+
     if (m_variables.Boundaries)
     {
         SetBounds(m_velocityTexture, -1);
+    }
+
+    /*
+        Debug Bounds
+    */
+    if (m_captureState) {
+        DebugPrint(m_velocityTexture.GetFront(), 50);
+        std::cout << "Now subtract result (velocityTexture.GetFront())" << std::endl;
     }
 
     // Calculate U = W - grad(P) where div(U)=0
@@ -207,6 +265,14 @@ void FluidSim::Execute()
     BindImage(m_subtractProgram, "c", m_velocityTexture.GetBack(), 2, GL_WRITE_ONLY);
     Compute(m_subtractProgram);
     m_velocityTexture.SwapBuffers();
+
+    /*
+        Debug Subtract
+    */
+    if (m_captureState) {
+        DebugPrint(m_velocityTexture.GetFront(), 50);
+        m_captureState = false;
+    }
 #pragma endregion
 
     // Transform feedback read
@@ -302,6 +368,7 @@ void FluidSim::display()
 		ImGui::SliderFloat("Dissipation", &m_variables.Dissipation, 0.0f, 1.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
 		ImGui::SliderFloat("Gravity", &m_variables.Gravity, 0.0f, 30.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
 		ImGui::SliderFloat("Viscosity", &m_variables.Viscosity, 0.0001f, 10.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+        ImGui::SliderFloat("ForceMulti", &m_variables.ForceMulti, 1.0f, 100.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
 
 		ImGui::SliderFloat("ForceMultiplier", &m_variables.ForceMultiplier, 0.1f, 10.0f);
 		ImGui::Checkbox("Boundaries", &m_variables.Boundaries);
