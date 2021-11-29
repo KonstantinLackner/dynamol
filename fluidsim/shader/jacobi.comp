@@ -23,16 +23,20 @@ void main()
 {
     ivec3 coord = ivec3(gl_GlobalInvocationID);
 
-    vec4 left = imageLoad(fieldx_r, clamp_coord(coord + ivec3(-1,0,0), imageSize(fieldx_r)));
-    vec4 right = imageLoad(fieldx_r, clamp_coord(coord + ivec3(1,0,0), imageSize(fieldx_r)));
-    vec4 top = imageLoad(fieldx_r, clamp_coord(coord + ivec3(0,1,0), imageSize(fieldx_r)));
-    vec4 bottom = imageLoad(fieldx_r, clamp_coord(coord + ivec3(0,-1,0), imageSize(fieldx_r)));
-    vec4 front = imageLoad(fieldx_r, clamp_coord(coord + ivec3(0,0,-1), imageSize(fieldx_r)));
-    vec4 back = imageLoad(fieldx_r, clamp_coord(coord + ivec3(0,0,1), imageSize(fieldx_r)));
+    ivec3 gridSize = imageSize(fieldx_r) - ivec3(1,1,1);
+
+    vec4 left = imageLoad(fieldx_r, clamp_coord(coord + ivec3(-1,0,0), gridSize));
+    vec4 right = imageLoad(fieldx_r, clamp_coord(coord + ivec3(1,0,0), gridSize));
+    vec4 top = imageLoad(fieldx_r, clamp_coord(coord + ivec3(0,1,0), gridSize));
+    vec4 bottom = imageLoad(fieldx_r, clamp_coord(coord + ivec3(0,-1,0), gridSize));
+    vec4 up = imageLoad(fieldx_r, clamp_coord(coord + ivec3(0,0,-1), gridSize));
+    vec4 down = imageLoad(fieldx_r, clamp_coord(coord + ivec3(0,0,1), gridSize));
 
     vec4 center = imageLoad(fieldb_r, coord);
 
-    vec4 result = (left + right + top + bottom + front + back + alpha * center) * beta;
+    //vec4 result = (left + right + top + bottom + up + down - center) / 6.0;
+
+    vec4 result = (left + right + top + bottom + up + down + (alpha * center)) * beta;
 
     imageStore(field_out, coord, result);
 }

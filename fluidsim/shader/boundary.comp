@@ -11,8 +11,6 @@ uniform image3D field_w;
 uniform float scale;
 uniform vec3 box_size;
 
-
-
 void main()
 {
 	ivec3 coord = ivec3(gl_GlobalInvocationID);
@@ -54,11 +52,3 @@ void main()
 
 	imageStore(field_w, coord, value);
 }
-
-/*
-void main()
-{
-	ivec3 coord = ivec3(gl_GlobalInvocationID);
-	vec4 value = imageLoad(field_r, coord);
-	imageStore(field_w, coord, value);
-}*/

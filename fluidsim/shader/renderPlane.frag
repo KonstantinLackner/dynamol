@@ -18,5 +18,7 @@ void main()
    vec3 color = texture(sampler, vec3(vTex, depth)).rgb;
    vec3 mapped = (color - range.x) / (range.y - range.x);
 
-   FragColor = vec4(mapped, 1.0);
+   //FragColor = vec4(abs(color/128.f),1.f);
+
+   FragColor = vec4(vec3(mapped.x, mapped.y, 0.f), 1.0);
 };

@@ -78,6 +78,10 @@ bool Renderer::createShaderProgram(const std::string& name, std::initializer_lis
 		program.m_shaders.insert(std::move(shader));
 	}
 
+#ifdef _DEBUG
+	glObjectLabel(GL_PROGRAM, program.m_program->id(), name.size(), name.c_str());
+#endif
+
 	m_shaderPrograms[name] = std::move(program);
 
 	return false;

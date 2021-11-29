@@ -36,9 +36,9 @@ namespace dynamol
     public:
         struct Variables
         {
-            float Dissipation{ 0.99f };
+            float Dissipation{ 0.995f };
             float Gravity{ 8.0f };
-            float Viscosity{ 0.0004 };
+            float Viscosity{ 0.0005 };
             float GlobalGravity{ 0.f };
             float ForceMulti{ 1.f };
             bool HasSeeded{ false };
@@ -56,7 +56,7 @@ namespace dynamol
         };
 
     public:
-        FluidSim(Renderer *renderer, const std::array<std::int32_t, 2> &windowDimensions, const std::array<std::int32_t, 3> &cubeDimensions);
+        FluidSim(Renderer *renderer, const std::array<std::int32_t, 2> &windowDimensions, const std::array<std::int32_t, 3> &minimumCubeDimensions);
         ~FluidSim();
 
     public:
@@ -71,6 +71,7 @@ namespace dynamol
         virtual void display() override;
 
     private:
+        std::array<std::int32_t, 3> DetermineCubeDimensions(std::array<std::int32_t, 3> minimumCubeDimensions);
         void LoadShaders();
         void BindImage(globjects::Program *program, std::string_view name, const CStdTexture3D &texture, int value, GLenum access);
         void Compute(globjects::Program *program);
@@ -79,6 +80,8 @@ namespace dynamol
         void SetBounds(CStdSwappableTexture3D &texture, float scale);
         void DoDroplets();
         void DebugPrint(const CStdTexture3D &texture, GLuint depth);
+        void DebugNanCheck(const CStdTexture3D &texture, GLuint depth);
+        void CallDebugMethods(const CStdTexture3D& texture, const GLuint depth, std::string location);
         glm::vec3 RandomPosition() const;
 
     private:
@@ -120,5 +123,6 @@ namespace dynamol
         GLuint m_frameCounter;
         GLuint m_frameTimeSum;
         bool m_captureState;
+        bool m_checkNan;
     };
 }

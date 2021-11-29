@@ -5,7 +5,7 @@ layout(local_size_x=1, local_size_y=1, local_size_z=1) in;
 layout(rgba16_snorm)
 uniform image3D field_r;
 
-layout(r16_snorm) 
+layout(rgba16_snorm) 
 uniform image3D field_w;
 
 uniform float gs;
@@ -23,10 +23,10 @@ void main()
     vec4 right = imageLoad(field_r, clamp_coord(coord + ivec3(1,0,0), imageSize(field_r)));
     vec4 top = imageLoad(field_r, clamp_coord(coord + ivec3(0,1,0), imageSize(field_r)));
     vec4 bottom = imageLoad(field_r, clamp_coord(coord + ivec3(0,-1,0), imageSize(field_r)));
-    vec4 front = imageLoad(field_r, clamp_coord(coord + ivec3(0,0,-1), imageSize(field_r)));
-    vec4 back = imageLoad(field_r, clamp_coord(coord + ivec3(0,0,1), imageSize(field_r)));
+    vec4 up = imageLoad(field_r, clamp_coord(coord + ivec3(0,0,-1), imageSize(field_r)));
+    vec4 down = imageLoad(field_r, clamp_coord(coord + ivec3(0,0,1), imageSize(field_r)));
     
-    float div = gs * (right.x - left.x + top.y - bottom.y + back.z - front.z);
+    float div = gs * (right.x - left.x + top.y - bottom.y + up.z - down.z);
 
     imageStore(field_w, coord, vec4(div, 0, 0, 0));
 }

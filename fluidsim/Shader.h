@@ -358,6 +358,11 @@ public:
 		glClearTexImage(texture, 0, format, type, nullptr);
 	}
 
+	void SetObjectLabel(std::string_view name) const
+	{
+		glObjectLabel(GL_TEXTURE, texture, name.size(), name.data());
+	}
+
 	GLuint GetTexture() const { return texture; }
 
 	const std::array<std::int32_t, Dimensions> &GetDimensions() const { return dimensions; }
@@ -407,7 +412,7 @@ public:
 		: CStdTexture{{width, height, depth}, internalFormat, format, type, data} {}
 
 	CStdTexture3D(const std::int32_t width, const std::int32_t height, const std::int32_t depth, const std::uint8_t channels, const bool snorm = false, const bool use32BitComponentWidth = false, void *const data = nullptr)
-		: CStdTexture3D{width, height, depth, snorm ? InternalSnormFormats.at(channels - 1) : InternalFormats.at(channels - 1)[use32BitComponentWidth], Formats[channels - 1], GL_FLOAT, data} {}
+		: CStdTexture3D{width, height, depth, snorm ? InternalSnormFormats.at(channels - 1) : InternalFormats.at(channels - 1)[use32BitComponentWidth], Formats[channels - 1], Type, data} {}
 
 	CStdTexture3D(const CStdTexture3D &) = delete;
 	CStdTexture3D(CStdTexture3D&& other) : CStdTexture3D{}
@@ -465,6 +470,13 @@ public:
 	{
 		using std::swap;
 		swap(front, back);
+	}
+
+	void SetObjectLabel(std::string_view name)
+	{
+		const std::string nameCopy{name.data(), name.size()};
+		buffer1.SetObjectLabel(nameCopy + " - buffer1");
+		buffer2.SetObjectLabel(nameCopy + " - buffer2");
 	}
 
 	const T &GetFront() const { return *front; }
