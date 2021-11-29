@@ -48,7 +48,7 @@ namespace dynamol
             struct
             {
                 std::int32_t Depth{ 0 };
-                glm::vec2 Range { -10.0f, 10.0f };
+                glm::vec2 Range { -128.0f, 128.0f };
             } DebugFramebuffer;
 
             static constexpr std::size_t NumJacobiRounds{ 40 };

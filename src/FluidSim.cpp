@@ -397,9 +397,9 @@ void FluidSim::display()
     if (ImGui::BeginMenu("FluidSim"))
     {
 		//ImGui::ColorEdit3("Background", glm::value_ptr(m_backgroundColor));
-		ImGui::SliderFloat("Dissipation", &m_variables.Dissipation, 0.0f, 1.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+		ImGui::SliderFloat("Dissipation", &m_variables.Dissipation, 0.9f, 1.0f, "%.5f", ImGuiSliderFlags_AlwaysClamp);
 		ImGui::SliderFloat("Gravity", &m_variables.Gravity, 0.0f, 30.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
-		ImGui::SliderFloat("Viscosity", &m_variables.Viscosity, 0.001f, 0.1f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+		ImGui::SliderFloat("Viscosity", &m_variables.Viscosity, 0.05f, 0.15f, "%.5f", ImGuiSliderFlags_AlwaysClamp);
         ImGui::SliderFloat("ForceMulti", &m_variables.ForceMulti, 1.0f, 100.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
 
 		ImGui::SliderFloat("ForceMultiplier", &m_variables.ForceMultiplier, 0.1f, 10.0f);
