@@ -10,7 +10,7 @@ uniform image3D field_w;
 
 uniform vec3 position;
 uniform float radius;
-uniform float forceMulti = 1.0f;
+uniform float forceMultiplier = 1.0f;
 uniform vec4 force;     // This is a vec4 because it's also used to add ink/colour 
 
 void impulse_point(ivec3 coord)
@@ -20,7 +20,7 @@ void impulse_point(ivec3 coord)
     vec4 effect = force * exp(x);
 
     vec4 u0 = imageLoad(field_r, coord);
-    vec4 summed = u0 + effect * forceMulti;
+    vec4 summed = u0 + effect * forceMultiplier;
     imageStore(field_w, coord, summed);
 }
 

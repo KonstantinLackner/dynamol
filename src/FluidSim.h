@@ -40,7 +40,6 @@ namespace dynamol
             float Gravity{ 8.0f };
             float Viscosity{ 0.0005 };
             float GlobalGravity{ 0.f };
-            float ForceMulti{ 1.f };
             bool HasSeeded{ false };
             bool Boundaries{ true };
             float ForceMultiplier{ 1.0f };
@@ -51,8 +50,8 @@ namespace dynamol
                 glm::vec2 Range { -128.0f, 128.0f };
             } DebugFramebuffer;
 
-            static constexpr std::size_t NumJacobiRounds{ 40 };
-            static constexpr std::size_t NumJacobiRoundsDiffusion{ 20 };
+            static constexpr std::size_t NumJacobiRounds{ 20 }; // 40
+            static constexpr std::size_t NumJacobiRoundsDiffusion{ 10 }; // 20
         };
 
     public:

@@ -166,7 +166,7 @@ void FluidSim::Execute()
         {
             m_addImpulseProgram->setUniform("position", impulseState.CurrentPos);
             m_addImpulseProgram->setUniform("radius", m_splatRadius);
-            m_addImpulseProgram->setUniform("forceMulti", m_variables.ForceMulti);
+            m_addImpulseProgram->setUniform("forceMultiplier", m_variables.ForceMultiplier);
             m_addImpulseProgram->setUniform("force", glm::vec4{ impulseState.Delta, 0 });
             BindImage(m_addImpulseProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
             BindImage(m_addImpulseProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
@@ -400,11 +400,9 @@ void FluidSim::display()
 		ImGui::SliderFloat("Dissipation", &m_variables.Dissipation, 0.9f, 1.0f, "%.5f", ImGuiSliderFlags_AlwaysClamp);
 		ImGui::SliderFloat("Gravity", &m_variables.Gravity, 0.0f, 30.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
 		ImGui::SliderFloat("Viscosity", &m_variables.Viscosity, 0.05f, 0.15f, "%.5f", ImGuiSliderFlags_AlwaysClamp);
-        ImGui::SliderFloat("ForceMulti", &m_variables.ForceMulti, 1.0f, 100.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
 
-		ImGui::SliderFloat("ForceMultiplier", &m_variables.ForceMultiplier, 0.1f, 10.0f);
+		ImGui::SliderFloat("ForceMultiplier", &m_variables.ForceMultiplier, 0.1f, 5.0f);
 		ImGui::Checkbox("Boundaries", &m_variables.Boundaries);
-		ImGui::SliderFloat("Global Gravity", &m_variables.GlobalGravity, 0.f, 10.f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
 
         ImGui::Separator();
         ImGui::SliderInt("Depth", &m_variables.DebugFramebuffer.Depth, 0, m_cubeDimensions[2] - 1, "%d", ImGuiSliderFlags_AlwaysClamp);
@@ -532,7 +530,7 @@ void FluidSim::DoDroplets()
     if (acc >= nextDrop)
     {
         acc = 0;
-        static constexpr auto Delay = 1000.0f; // Should be 1000
+        static constexpr auto Delay = 10.0f; // Should be 1000
         nextDrop = Delay + std::pow(-1, std::rand() % 2) * (std::rand() % static_cast<int>(0.5 * Delay));
         //LOG_INFO("Next drop: %.2f", next_drop);
 
@@ -545,7 +543,6 @@ void FluidSim::DoDroplets()
         impulseState.ForceActive = true;
         impulseState.InkActive = true;
         impulseState.Radial = true;
-
         m_impulseState.emplace<ImpulseState>(impulseState);
     }
 }
