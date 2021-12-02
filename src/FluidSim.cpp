@@ -197,15 +197,14 @@ void FluidSim::Execute()
     */
     CallDebugMethods(m_velocityTexture.GetFront(), 50, "Divergence");
 
-/*
-#pragma region Gravity
+
+/*#pragma region Gravity
     m_globalGravityProgram->setUniform("gravity", m_variables.GlobalGravity);
     BindImage(m_globalGravityProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
     BindImage(m_globalGravityProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
     Compute(m_globalGravityProgram);
     m_velocityTexture.SwapBuffers();
-#pragma endregion
-*/
+#pragma endregion*/
 
 
 #pragma region Projection
@@ -397,9 +396,10 @@ void FluidSim::display()
     if (ImGui::BeginMenu("FluidSim"))
     {
 		//ImGui::ColorEdit3("Background", glm::value_ptr(m_backgroundColor));
-		ImGui::SliderFloat("Dissipation", &m_variables.Dissipation, 0.9f, 1.0f, "%.5f", ImGuiSliderFlags_AlwaysClamp);
-		ImGui::SliderFloat("Gravity", &m_variables.Gravity, 0.0f, 30.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
-		ImGui::SliderFloat("Viscosity", &m_variables.Viscosity, 0.05f, 0.15f, "%.5f", ImGuiSliderFlags_AlwaysClamp);
+		ImGui::SliderFloat("Dissipation", &m_variables.Dissipation, 0.9f, 1.0f, "%.5f");//, ImGuiSliderFlags_AlwaysClamp);
+		ImGui::SliderFloat("Gravity", &m_variables.Gravity, 0.0f, 30.0f, "%.3f");//, ImGuiSliderFlags_AlwaysClamp);
+        ImGui::SliderFloat("GlobalGravity", &m_variables.GlobalGravity, 0.0f, 30.0f, "%.3f");//, ImGuiSliderFlags_AlwaysClamp);
+		ImGui::SliderFloat("Viscosity", &m_variables.Viscosity, 0.001f, 0.15f, "%.5f");//, ImGuiSliderFlags_AlwaysClamp);
 
 		ImGui::SliderFloat("ForceMultiplier", &m_variables.ForceMultiplier, 0.1f, 5.0f);
 		ImGui::Checkbox("Boundaries", &m_variables.Boundaries);
@@ -430,8 +430,8 @@ void FluidSim::LoadShaders()
     std::array<char, 1024> buffer;
     std::snprintf(buffer.data(), buffer.size(), FormatString, WorkGroupSize[0], WorkGroupSize[1], WorkGroupSize[2]);
     globjects::Shader::globalReplace("layout(local_size_x=1, local_size_y=1, local_size_z=1)", buffer.data());
-    globjects::Shader::globalReplace("layout(rgba16_snorm)", "layout(rgba32f)"); //potentially comment this out
-    globjects::Shader::globalReplace("layout(r16_snorm)", "layout(r32f)");
+    globjects::Shader::globalReplace("layout(rgba16_snorm", "layout(rgba32f"); //potentially comment this out
+    globjects::Shader::globalReplace("layout(r16_snorm", "layout(r32f");
 
     const auto addShaderProgram = [this](globjects::Program *(FluidSim::*program), std::string_view name, std::initializer_list<std::pair<gl::GLenum, std::string>> shaders)
     {

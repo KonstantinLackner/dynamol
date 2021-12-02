@@ -1,12 +1,24 @@
 #version 450 core
 
 in vec4 coords;
-layout(rgba16_snorm, binding = 0) uniform image3D image;
+layout(rgba32f, binding = 0) uniform image3D image;
 uniform vec3 minBounds;
+uniform vec3 maxBounds;
 
-out vec4 vCoords;
+out vec4 outCoords;
 
 void main()
 {
-    vCoords = coords + vec4(imageLoad(image, ivec3(coords.xyz - minBounds)).xyz, 0);
+    /*if (clamp(coords.xyz, minBounds, maxBounds) != coords.xyz)
+    {
+        outCoords = coords;
+    }
+    else
+    {
+        outCoords = coords + vec4(
+            imageLoad(image, ivec3(coords.xyz - minBounds)).xyz,
+        0);
+    }*/
+
+    outCoords = coords + vec4(imageLoad(image, ivec3(coords.xyz - minBounds)).xyz, 0);
 }

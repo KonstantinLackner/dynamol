@@ -37,6 +37,22 @@ void error_callback(int errnum, const char * errmsg)
 	globjects::critical() << errnum << ": " << errmsg << std::endl;
 }
 
+static void GLAPIENTRY MessageCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam)
+{
+	std::printf("source: %d, type: %d, id: %ul, severity: %d, message: %s\n", source, type, id, severity, message);
+}
+
+static void *glMapBufferStub(GLenum target, GLenum access)
+{
+	return reinterpret_cast<void *(*)(GLenum, GLenum)>(glfwGetProcAddress("glMapBuffer"))(target, access);
+}
+
+static void *glMapNamedBufferStub(GLuint buffer, GLenum access)
+{
+	return reinterpret_cast<void *(*)(GLuint, GLenum)>(glfwGetProcAddress("glMapNamedBuffer"))(buffer, access);
+}
+
+
 int main(int argc, char *argv[])
 {
 	// Initialize GLFW
@@ -69,6 +85,14 @@ int main(int argc, char *argv[])
 
 	// Initialize globjects (internally initializes glbinding, and registers the current context)
 	globjects::init([](const char * name) {
+		/*if (std::strcmp(name, "glMapBuffer") == 0)
+		{
+			return reinterpret_cast<GLFWglproc>(&glMapBufferStub);
+		}
+		else if (std::strcmp(name, "glMapNamedBuffer") == 0)
+		{
+			return reinterpret_cast<GLFWglproc>(&glMapNamedBufferStub);
+		}*/
 		return glfwGetProcAddress(name);
 	});
 
@@ -106,6 +130,8 @@ int main(int argc, char *argv[])
 
 
 	glfwSwapInterval(0);
+
+	//glDebugMessageCallback(&MessageCallback, nullptr);
 
 	// Main loop
 	while (!glfwWindowShouldClose(window))

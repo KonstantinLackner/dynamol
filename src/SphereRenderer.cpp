@@ -166,11 +166,12 @@ SphereRenderer::SphereRenderer(Viewer* viewer) : Renderer(viewer), Interactor{vi
 
 	createShaderProgram("transformfeedback", {
 			{ GL_VERTEX_SHADER, "./fluidsim/shader/transform_feedback.vert"},
-			{ GL_GEOMETRY_SHADER, "./fluidsim/shader/transform_feedback.geom"}
-	},
-		{ "./res/model/globals.glsl"});
+			//{ GL_GEOMETRY_SHADER, "./fluidsim/shader/transform_feedback.geom"}
+		},
+		{ "./res/model/globals.glsl" });
 
 	shaderProgram("transformfeedback")->setUniform("minBounds", viewer->scene()->protein()->minimumBounds());
+	shaderProgram("transformfeedback")->setUniform("maxBounds", viewer->scene()->protein()->maximumBounds());
 
 	m_framebufferSize = viewer->viewportSize();
 
@@ -351,7 +352,7 @@ SphereRenderer::SphereRenderer(Viewer* viewer) : Renderer(viewer), Interactor{vi
 	m_shadowFramebuffer->setDrawBuffers({ GL_COLOR_ATTACHMENT0 });
 
 	m_transformFeedback.reset(new TransformFeedback());
-	m_transformFeedback->setVaryings(shaderProgram("transformfeedback"), {"gCoords"}, GL_INTERLEAVED_ATTRIBS);
+	m_transformFeedback->setVaryings(shaderProgram("transformfeedback"), {"outCoords"}, GL_INTERLEAVED_ATTRIBS);
 }
 
 void SphereRenderer::display()
@@ -663,7 +664,8 @@ void SphereRenderer::display()
 
 	// Read buffer from fluidsim
 	// Vertex binding setup
-	const globjects::Buffer *const buffer{m_vertices[currentTimestep].get()};
+	const globjects::Buffer *const buffer{m_transformedCoordinates.first.get()};
+	//const globjects::Buffer *const buffer{m_vertices[currentTimestep].get()};
 	auto vertexBinding = m_vao->binding(0);
 	vertexBinding->setAttribute(0);
 	vertexBinding->setBuffer(buffer, 0, sizeof(vec4));
@@ -673,7 +675,7 @@ void SphereRenderer::display()
 
 	glEnable(GL_RASTERIZER_DISCARD);
 
-	m_transformedCoordinates->bindBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0);
+	m_transformedCoordinates.second->bindBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0);
 	viewer()->fluidSim()->GetVelocityTexture().BindImage(0, GL_READ_ONLY);
 	programTransformFeedback->use();
 
@@ -683,11 +685,15 @@ void SphereRenderer::display()
 	m_vao->drawArrays(GL_POINTS, 0, vertexCount);
 
 	m_transformFeedback->end();
-	m_transformFeedback->unbind();
+	//m_transformFeedback->unbind();
+	glFlush();
 
 	glDisable(GL_RASTERIZER_DISCARD);
+	glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, 0);
 
-	vertexBinding->setBuffer(m_transformedCoordinates.get(), 0, sizeof(glm::vec4));
+	vertexBinding->setBuffer(m_transformedCoordinates.second.get(), 0, sizeof(glm::vec4));
+
+	std::swap(m_transformedCoordinates.first, m_transformedCoordinates.second);
 
 	/* Used for interploation, which is not active
 	if (timestepCount > 0)
@@ -1181,6 +1187,7 @@ void SphereRenderer::initBuffers()
 		m_vertices.back()->setStorage(i, gl::GL_NONE_BIT);
 	}
 
-	m_transformedCoordinates = Buffer::create();
-	m_transformedCoordinates->setStorage(viewer()->scene()->protein()->atoms()[0].size() * sizeof(glm::vec4), nullptr, GL_NONE_BIT);
+	m_transformedCoordinates = {Buffer::create(), Buffer::create()};
+	m_transformedCoordinates.first->setStorage(viewer()->scene()->protein()->atoms()[0], GL_NONE_BIT);
+	m_transformedCoordinates.second->setStorage(viewer()->scene()->protein()->atoms()[0].size() * sizeof(glm::vec4), nullptr, GL_NONE_BIT);
 }

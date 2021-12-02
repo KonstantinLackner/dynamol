@@ -85,7 +85,7 @@ namespace dynamol
 		std::vector< std::unique_ptr<globjects::Texture> > m_bumpTextures;
 
 		std::unique_ptr<globjects::TransformFeedback> m_transformFeedback = nullptr;
-		std::unique_ptr<globjects::Buffer> m_transformedCoordinates = nullptr;
+		std::pair<std::unique_ptr<globjects::Buffer>, std::unique_ptr<globjects::Buffer>> m_transformedCoordinates;
 
 		glm::ivec2 m_shadowMapSize = glm::ivec2(512, 512);
 		glm::ivec2 m_framebufferSize;
