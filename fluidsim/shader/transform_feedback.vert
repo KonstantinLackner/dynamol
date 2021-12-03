@@ -1,9 +1,11 @@
 #version 450 core
 
 in vec4 coords;
-layout(rgba32f, binding = 0) uniform image3D image;
+layout(binding = 0) uniform sampler3D sampler;
 uniform vec3 minBounds;
 uniform vec3 maxBounds;
+
+uniform float forceMultiplier = 0.1;
 
 out vec4 outCoords;
 
@@ -14,11 +16,7 @@ void main()
         outCoords = coords;
     }
     else
-    {
-        outCoords = coords + vec4(
-            imageLoad(image, ivec3(coords.xyz - minBounds)).xyz,
-        0);
-    }*/
-
-    outCoords = coords + vec4(imageLoad(image, ivec3(coords.xyz - minBounds)).xyz, 0);
+    {*/
+        outCoords = vec4(clamp(coords.xyz + textureLod(sampler, coords.xyz - minBounds, 0).xyz * forceMultiplier, minBounds, maxBounds), coords.w);
+    //}
 }

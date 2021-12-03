@@ -14,7 +14,7 @@ void main()
 {
 	ivec3 coord = ivec3(gl_GlobalInvocationID);
 	vec4 value = imageLoad(field_r, coord);
-	value.x = -gravity;
-	// + vec4(0, -gravity, 0, 0);
+	//value.x = -gravity;
+	value += vec4(0, -gravity, 0, 0);
 	imageStore(field_w, coord, value);
 }

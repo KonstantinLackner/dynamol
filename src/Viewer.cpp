@@ -430,10 +430,15 @@ void Viewer::endFrame()
 		m_saveScreenshot = false;
 	}
 
-	ImGui::Begin("Debug Framebuffer");
-	const std::uint64_t textureHandle{m_fluidSim->GetDebugFramebufferTexture()};
-	ImGui::Image(reinterpret_cast<ImTextureID>(textureHandle), ImGui::GetContentRegionAvail());
-	ImGui::End();
+	for (const auto &debugFramebuffer : m_fluidSim->GetDebugFramebuffers())
+	{
+		ImGui::Begin(debugFramebuffer.name.data());
+
+		const std::uint64_t textureHandle{debugFramebuffer.framebuffer.GetTexture().GetTexture()};
+		ImGui::Image(reinterpret_cast<ImTextureID>(textureHandle), ImGui::GetContentRegionAvail());
+
+		ImGui::End();
+	}
 
 	if (m_showUi)
 		renderUi();

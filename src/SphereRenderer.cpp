@@ -676,7 +676,8 @@ void SphereRenderer::display()
 	glEnable(GL_RASTERIZER_DISCARD);
 
 	m_transformedCoordinates.second->bindBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0);
-	viewer()->fluidSim()->GetVelocityTexture().BindImage(0, GL_READ_ONLY);
+	//viewer()->fluidSim()->GetVelocityTexture().BindImage(0, GL_READ_ONLY);
+	viewer()->fluidSim()->GetVelocityTexture().Bind(0);
 	programTransformFeedback->use();
 
 	m_transformFeedback->bind();

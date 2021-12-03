@@ -36,13 +36,14 @@ namespace dynamol
     public:
         struct Variables
         {
-            float Dissipation{ 0.995f }; // { 0.995f };
-            float Gravity{ 8.0f }; // { 8.0f };
-            float Viscosity{ 0.0005 };
-            float GlobalGravity{ 1.0f };
+            float Dissipation{ 0.95f }; // { 0.995f };
+            float Gravity{ 1.0f }; // { 8.0f };
+            float Viscosity{ 0.05f }; // { 0.05f };
+            float GlobalGravity{ 0.0f };
             bool HasSeeded{ false };
-            bool Boundaries{ true };
+            bool Boundaries{ false };
             float ForceMultiplier{ 1.0f };
+            float SplatRadius{ 20.0f };
 
             struct
             {
@@ -54,13 +55,19 @@ namespace dynamol
             static constexpr std::size_t NumJacobiRoundsDiffusion{ 10 }; // 20
         };
 
+        struct DebugFramebuffer
+        {
+            std::string_view name;
+            CStdFramebuffer framebuffer;
+        };
+
     public:
         FluidSim(Renderer *renderer, const std::array<std::int32_t, 2> &windowDimensions, const std::array<std::int32_t, 3> &minimumCubeDimensions);
         ~FluidSim();
 
     public:
         void Execute();
-        GLuint GetDebugFramebufferTexture() const;
+        const std::vector<DebugFramebuffer> &GetDebugFramebuffers() const;
         const CStdTexture3D &GetVelocityTexture() const;
         bool WantsMouseInput() const { return m_wantsMouseInput; }
 
@@ -82,6 +89,7 @@ namespace dynamol
         void DebugNanCheck(const CStdTexture3D &texture, GLuint depth);
         void CallDebugMethods(const CStdTexture3D& texture, const GLuint depth, std::string location);
         glm::vec3 RandomPosition() const;
+        void RenderToDebugFramebuffer(DebugFramebuffer &debugFramebuffer, const CStdTexture3D &texture);
 
     private:
         static constexpr std::array<int32_t, 3> WorkGroupSize{8, 8, 8};
@@ -110,11 +118,10 @@ namespace dynamol
         CStdSwappableTexture3D m_pressureTexture; // TODO: Pressure only needs 1 channel
         CStdTexture3D m_divergenceTexture;
         CStdTexture3D m_temporaryTexture;
-        CStdFramebuffer m_debugFramebuffer;
+        std::vector<DebugFramebuffer> m_debugFramebuffers;
         CStdRectangle m_quad;
         float m_dt;
         float m_gridScale;
-        float m_splatRadius;
         float m_lastTime;
         std::variant<std::monostate, ImpulseState, std::pair<glm::vec3, glm::vec3>> m_impulseState;
         bool m_mouseButtonPressed;

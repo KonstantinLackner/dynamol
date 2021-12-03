@@ -33,9 +33,7 @@ FluidSim::FluidSim(Renderer *const renderer, const std::array<std::int32_t, 2> &
       m_pressureTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true },
       m_divergenceTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true },
 	  m_temporaryTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true },
-      m_debugFramebuffer{windowDimensions[0], windowDimensions[1]},
       m_gridScale{1.0f/128.f},
-      m_splatRadius{m_cubeDimensions[0] * 0.37f},
       m_dt{0},
       m_lastTime{0},
       m_mouseButtonPressed{false},
@@ -45,14 +43,23 @@ FluidSim::FluidSim(Renderer *const renderer, const std::array<std::int32_t, 2> &
       m_captureState{false},
       m_checkNan{false}
 {
+    m_debugFramebuffers.emplace_back(DebugFramebuffer{"initial", {windowDimensions[0], windowDimensions[1]}});
+    m_debugFramebuffers.emplace_back(DebugFramebuffer{"After Advection", {windowDimensions[0], windowDimensions[1]}});
+    m_debugFramebuffers.emplace_back(DebugFramebuffer{"After Diffusion", {windowDimensions[0], windowDimensions[1]}});
+    m_debugFramebuffers.emplace_back(DebugFramebuffer{"Result", {windowDimensions[0], windowDimensions[1]}});
+
     m_velocityTexture.SetObjectLabel("velocity");
     m_pressureTexture.SetObjectLabel("pressure");
     m_divergenceTexture.SetObjectLabel("divergence");
     m_temporaryTexture.SetObjectLabel("temporary");
     LoadShaders();
-    m_debugFramebuffer.Bind();
-    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-    m_debugFramebuffer.Unbind();
+
+    for (const auto &framebuffer : m_debugFramebuffers)
+    {
+        framebuffer.framebuffer.Bind();
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        framebuffer.framebuffer.Unbind();
+    }
 }
 
 FluidSim::~FluidSim()
@@ -97,6 +104,7 @@ void FluidSim::Execute()
     /*
         Debug Start
     */
+    RenderToDebugFramebuffer(m_debugFramebuffers[0], m_velocityTexture.GetFront());
     CallDebugMethods(m_velocityTexture.GetFront(), 50, "Advection");
 
 #pragma region Advection
@@ -115,6 +123,7 @@ void FluidSim::Execute()
     /*
         Debug Advection
     */
+    RenderToDebugFramebuffer(m_debugFramebuffers[1], m_velocityTexture.GetFront());
     CallDebugMethods(m_velocityTexture.GetFront(), 50, "Diffuse");
 
 #pragma region Diffuse
@@ -125,6 +134,7 @@ void FluidSim::Execute()
     /*
         Debug Diffuse
     */
+    RenderToDebugFramebuffer(m_debugFramebuffers[2], m_velocityTexture.GetFront());
     CallDebugMethods(m_velocityTexture.GetFront(), 50, "Impulse");
 
 #pragma region Impulse
@@ -165,7 +175,7 @@ void FluidSim::Execute()
         [this](const ImpulseState &impulseState)
         {
             m_addImpulseProgram->setUniform("position", impulseState.CurrentPos);
-            m_addImpulseProgram->setUniform("radius", m_splatRadius);
+            m_addImpulseProgram->setUniform("radius", m_variables.SplatRadius);
             m_addImpulseProgram->setUniform("forceMultiplier", m_variables.ForceMultiplier);
             m_addImpulseProgram->setUniform("force", glm::vec4{ impulseState.Delta, 0 });
             BindImage(m_addImpulseProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
@@ -175,7 +185,7 @@ void FluidSim::Execute()
         },
         [this](const std::pair<glm::vec3, glm::vec3> &impulseLine)
         {
-            m_addImpulseLineProgram->setUniform("radius", m_splatRadius);
+            m_addImpulseLineProgram->setUniform("radius", m_variables.SplatRadius);
             m_addImpulseLineProgram->setUniform("start", impulseLine.first);
             m_addImpulseLineProgram->setUniform("end", impulseLine.second);
             m_addImpulseLineProgram->setUniform("cameraPosition", m_renderer->viewer()->cameraPosition());
@@ -198,13 +208,13 @@ void FluidSim::Execute()
     CallDebugMethods(m_velocityTexture.GetFront(), 50, "Divergence");
 
 
-/*#pragma region Gravity
+#pragma region Gravity
     m_globalGravityProgram->setUniform("gravity", m_variables.GlobalGravity);
     BindImage(m_globalGravityProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
     BindImage(m_globalGravityProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
     Compute(m_globalGravityProgram);
     m_velocityTexture.SwapBuffers();
-#pragma endregion*/
+#pragma endregion
 
 
 #pragma region Projection
@@ -281,20 +291,7 @@ void FluidSim::Execute()
     }
 #pragma endregion
 
-#pragma region Render
-    // Zu Debugmethode um dann damit zu prüfen, ob bspw. divergence 0, oder wie die einzelnen werte ausschauenS
-    m_debugFramebuffer.Bind();
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    m_renderPlaneProgram->use();
-    m_velocityTexture.Bind(0);
-    m_renderPlaneProgram->setUniform("depth", static_cast<float>(m_variables.DebugFramebuffer.Depth));
-    m_renderPlaneProgram->setUniform("range", m_variables.DebugFramebuffer.Range);
-    m_quad.Bind();
-
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-    m_quad.Draw();
-    m_debugFramebuffer.Unbind();
-#pragma endregion
+    RenderToDebugFramebuffer(m_debugFramebuffers[3], m_velocityTexture.GetFront());
 }
 
 void FluidSim::CallDebugMethods(const CStdTexture3D& texture, const GLuint depth, std::string location) {
@@ -357,10 +354,9 @@ void FluidSim::DebugNanCheck(const CStdTexture3D& texture, const GLuint depth)
     }
 }
 
-
-GLuint FluidSim::GetDebugFramebufferTexture() const
+const std::vector<FluidSim::DebugFramebuffer> &FluidSim::GetDebugFramebuffers() const
 {
-    return m_debugFramebuffer.GetTexture().GetTexture();
+    return m_debugFramebuffers;
 }
 
 const CStdTexture3D &FluidSim::GetVelocityTexture() const
@@ -382,8 +378,8 @@ void FluidSim::keyEvent(const int key, const int scancode, const int action, con
 
 void FluidSim::mouseButtonEvent(const int button, const int action, const int mods)
 {
-    if (button != GLFW_MOUSE_BUTTON_LEFT) return;
-    m_mouseButtonPressed = action == GLFW_PRESS;
+    //if (button != GLFW_MOUSE_BUTTON_LEFT) return;
+    //m_mouseButtonPressed = action == GLFW_PRESS;
 }
 
 void FluidSim::cursorPosEvent(const double x, const double y)
@@ -395,11 +391,22 @@ void FluidSim::display()
 {
     if (ImGui::BeginMenu("FluidSim"))
     {
+        int sliderFlags{0};
+        bool clamp{false};
+        ImGui::Checkbox("Clamp", &clamp);
+        if (clamp)
+        {
+            sliderFlags = ImGuiSliderFlags_AlwaysClamp;
+        }
+
+        ImGui::Separator();
+
 		//ImGui::ColorEdit3("Background", glm::value_ptr(m_backgroundColor));
-		ImGui::SliderFloat("Dissipation", &m_variables.Dissipation, 0.9f, 1.0f, "%.5f");//, ImGuiSliderFlags_AlwaysClamp);
-		ImGui::SliderFloat("Gravity", &m_variables.Gravity, 0.0f, 30.0f, "%.3f");//, ImGuiSliderFlags_AlwaysClamp);
-        ImGui::SliderFloat("GlobalGravity", &m_variables.GlobalGravity, 0.0f, 30.0f, "%.3f");//, ImGuiSliderFlags_AlwaysClamp);
-		ImGui::SliderFloat("Viscosity", &m_variables.Viscosity, 0.001f, 0.15f, "%.5f");//, ImGuiSliderFlags_AlwaysClamp);
+		ImGui::SliderFloat("Dissipation", &m_variables.Dissipation, 0.9f, 1.0f, "%.5f", sliderFlags);
+		ImGui::SliderFloat("Gravity", &m_variables.Gravity, 0.0f, 30.0f, "%.3f", sliderFlags);
+        ImGui::SliderFloat("GlobalGravity", &m_variables.GlobalGravity, 0.0f, 30.0f, "%.3f", sliderFlags);
+		ImGui::SliderFloat("Viscosity", &m_variables.Viscosity, 0.001f, 0.15f, "%.5f", sliderFlags);
+        ImGui::SliderFloat("SplatRadius", &m_variables.SplatRadius, 1.0f, (m_cubeDimensions[0] / 5.0f) * 4.0f, "%.5f", sliderFlags);
 
 		ImGui::SliderFloat("ForceMultiplier", &m_variables.ForceMultiplier, 0.1f, 5.0f);
 		ImGui::Checkbox("Boundaries", &m_variables.Boundaries);
@@ -530,7 +537,7 @@ void FluidSim::DoDroplets()
     if (acc >= nextDrop)
     {
         acc = 0;
-        static constexpr auto Delay = 10.0f; // Should be 1000
+        static constexpr auto Delay = 100.0f; // Should be 1000
         nextDrop = Delay + std::pow(-1, std::rand() % 2) * (std::rand() % static_cast<int>(0.5 * Delay));
         //LOG_INFO("Next drop: %.2f", next_drop);
 
@@ -550,6 +557,21 @@ void FluidSim::DoDroplets()
 glm::vec3 FluidSim::RandomPosition() const
 {
     return { std::rand() % m_cubeDimensions[0], std::rand() % m_cubeDimensions[1], std::rand() % m_cubeDimensions[2] };
+}
+
+void FluidSim::RenderToDebugFramebuffer(DebugFramebuffer &debugFramebuffer, const CStdTexture3D &texture)
+{
+    debugFramebuffer.framebuffer.Bind();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    m_renderPlaneProgram->use();
+    texture.Bind(0);
+    m_renderPlaneProgram->setUniform("depth", static_cast<float>(m_variables.DebugFramebuffer.Depth));
+    m_renderPlaneProgram->setUniform("range", m_variables.DebugFramebuffer.Range);
+    m_quad.Bind();
+
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    m_quad.Draw();
+    debugFramebuffer.framebuffer.Unbind();
 }
 
 }

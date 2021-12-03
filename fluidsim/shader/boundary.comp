@@ -17,37 +17,21 @@ void main()
 	ivec3 img_size = imageSize(field_r);
 	ivec3 offset = ivec3(0);
 
-	if (coord.x == 0)
-	{
-		offset += ivec3(1, 0, 0);
-	}
-	else if (coord.x == img_size.x)
-	{
-		offset += ivec3(-1, 0, 0);
-	}
-
-	if (coord.y == 0)
-	{
-		offset += ivec3(0, 1, 0);
-	}
-	else if (coord.y == img_size.y)
-	{
-		offset += ivec3(0, -1, 0);
-	}
-
-	if (coord.z == 0)
-	{
-		offset += ivec3(0, 0, 1);
-	}
-	else if (coord.z == img_size.z)
-	{
-		offset += ivec3(0, 0, -1);
-	}
-
 	vec4 value = imageLoad(field_r, coord);
-	
-	if (offset != ivec3(0, 0, 0)) {
-		value *= scale;
+
+	if (coord.x == 0 || coord.x == img_size.x - 1)
+	{
+		value.x *= scale;
+	}
+
+	if (coord.y == 0 || coord.y == img_size.y - 1)
+	{
+		value.y *= scale;
+	}
+
+	if (coord.z == 0 || coord.z == img_size.z - 1)
+	{
+		value.z *= scale;
 	}
 
 	imageStore(field_w, coord, value);
