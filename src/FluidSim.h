@@ -36,12 +36,12 @@ namespace dynamol
     public:
         struct Variables
         {
-            float Dissipation{ 0.95f }; // { 0.995f };
+            float Dissipation{ 0.90f }; // { 0.995f };
             float Gravity{ 1.0f }; // { 8.0f };
             float Viscosity{ 0.05f }; // { 0.05f };
             float GlobalGravity{ 0.0f };
             bool HasSeeded{ false };
-            bool Boundaries{ false };
+            bool Boundaries{ true };
             float ForceMultiplier{ 1.0f };
             float SplatRadius{ 20.0f };
 
