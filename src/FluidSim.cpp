@@ -33,6 +33,7 @@ FluidSim::FluidSim(Renderer *const renderer, const std::array<std::int32_t, 2> &
       m_pressureTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true },
       m_divergenceTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true },
 	  m_temporaryTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true },
+      m_inkTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true },
       m_debugBoundaryTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true },
       m_gridScale{1.0f/128.f},
       m_dt{0},
@@ -49,11 +50,13 @@ FluidSim::FluidSim(Renderer *const renderer, const std::array<std::int32_t, 2> &
     m_debugFramebuffers.emplace(std::string_view{"After Diffusion"}, CStdFramebuffer{windowDimensions[0], windowDimensions[1]});
     m_debugFramebuffers.emplace(std::string_view{"Result"}, CStdFramebuffer{windowDimensions[0], windowDimensions[1]});
     m_debugFramebuffers.emplace(std::string_view{"Boundary"}, CStdFramebuffer{windowDimensions[0], windowDimensions[1]});
+    m_debugFramebuffers.emplace(std::string_view{"Ink"}, CStdFramebuffer{windowDimensions[0], windowDimensions[1]});
 
     m_velocityTexture.SetObjectLabel("velocity");
     m_pressureTexture.SetObjectLabel("pressure");
     m_divergenceTexture.SetObjectLabel("divergence");
     m_temporaryTexture.SetObjectLabel("temporary");
+    m_inkTexture.SetObjectLabel("ink");
     m_debugBoundaryTexture.SetObjectLabel("debugBoundary");
     LoadShaders();
 
@@ -76,7 +79,10 @@ void FluidSim::Execute()
     //m_dt = 0.02;
     m_lastTime = now;
 
-    //DoDroplets();
+    if (m_variables.DoDroplets)
+    {
+        DoDroplets();
+    }
 
     m_timerQuery->begin(GL_TIME_ELAPSED);
 
@@ -107,7 +113,7 @@ void FluidSim::Execute()
     /*
         Debug Start
     */
-    RenderToDebugFramebuffer(m_debugFramebuffers["Initial"], m_velocityTexture.GetFront());
+    RenderToDebugFramebuffer("Initial", m_velocityTexture.GetFront());
     CallDebugMethods(m_velocityTexture.GetFront(), 50, "Advection");
 
 #pragma region Advection
@@ -126,7 +132,7 @@ void FluidSim::Execute()
     /*
         Debug Advection
     */
-    RenderToDebugFramebuffer(m_debugFramebuffers["After Advection"], m_velocityTexture.GetFront());
+    RenderToDebugFramebuffer("After Advection", m_velocityTexture.GetFront());
     CallDebugMethods(m_velocityTexture.GetFront(), 50, "Diffuse");
 
 #pragma region Diffuse
@@ -137,7 +143,7 @@ void FluidSim::Execute()
     /*
         Debug Diffuse
     */
-    RenderToDebugFramebuffer(m_debugFramebuffers["After Diffusion"], m_velocityTexture.GetFront());
+    RenderToDebugFramebuffer("After Diffusion", m_velocityTexture.GetFront());
     CallDebugMethods(m_velocityTexture.GetFront(), 50, "Impulse");
 
 #pragma region Impulse
@@ -201,8 +207,6 @@ void FluidSim::Execute()
         [this](std::monostate) {}
     }, m_impulseState);
 
-    m_impulseState.emplace<0>();
-
 #pragma endregion
 
     /*
@@ -257,7 +261,7 @@ void FluidSim::Execute()
     if (m_variables.Boundaries)
     {
         SetBounds(m_velocityTexture, -1);
-        RenderToDebugFramebuffer(m_debugFramebuffers["Boundary"], m_debugBoundaryTexture);
+        RenderToDebugFramebuffer("Boundary", m_debugBoundaryTexture);
     }
 
     /*
@@ -295,7 +299,67 @@ void FluidSim::Execute()
     }
 #pragma endregion
 
-    RenderToDebugFramebuffer(m_debugFramebuffers["Result"], m_velocityTexture.GetFront());
+    RenderToDebugFramebuffer("Result", m_velocityTexture.GetFront());
+
+    if (m_inkVariables.DoInk)
+    {
+        DoInk();
+    }
+
+    m_impulseState.emplace<std::monostate>();
+}
+
+void FluidSim::DoInk()
+{
+    m_advectionProgram->setUniform("delta_t", m_dt);
+    m_advectionProgram->setUniform("dissipation", m_inkVariables.Dissipation);
+    m_advectionProgram->setUniform("gs", m_gridScale);
+    m_advectionProgram->setUniform("gravity", 0.0f);
+    BindImage(m_advectionProgram, "quantity_r", m_inkTexture.GetFront(), 0, GL_READ_ONLY);
+    BindImage(m_advectionProgram, "quantity_w", m_inkTexture.GetBack(), 1, GL_WRITE_ONLY);
+    BindImage(m_advectionProgram, "velocity", m_velocityTexture.GetFront(), 2, GL_READ_ONLY);
+    Compute(m_advectionProgram);
+    m_inkTexture.SwapBuffers();
+
+    const float alpha{ (m_gridScale * m_gridScale) / (m_inkVariables.Viscosity * m_dt) };
+    const float beta{ 1.0f / (6.0f + alpha) };
+    SolvePoissonSystem(m_inkTexture, m_inkTexture.GetFront(), alpha, beta, false);
+
+    std::visit(Visitor{
+        [this](ImpulseState &impulseState)
+        {
+            glm::vec4 color{m_inkVariables.RainbowMode ? impulseState.TickRainbowMode(m_dt) : m_inkVariables.InkColor };
+            m_addImpulseProgram->setUniform("position", impulseState.CurrentPos);
+            m_addImpulseProgram->setUniform("radius", m_inkVariables.InkVolume);
+            m_addImpulseProgram->setUniform("forceMultiplier", 1.0f);
+            m_addImpulseProgram->setUniform("force", color);
+            BindImage(m_addImpulseProgram, "field_r", m_inkTexture.GetFront(), 0, GL_READ_ONLY);
+            BindImage(m_addImpulseProgram, "field_w", m_inkTexture.GetBack(), 1, GL_WRITE_ONLY);
+            Compute(m_addImpulseProgram);
+            m_inkTexture.SwapBuffers();
+        },
+        [this](const std::pair<glm::vec3, glm::vec3> &impulseLine)
+        {
+            /*m_addImpulseLineProgram->setUniform("radius", m_inkVariables.InkVolume);
+            m_addImpulseLineProgram->setUniform("start", impulseLine.first);
+            m_addImpulseLineProgram->setUniform("end", impulseLine.second);
+            m_addImpulseLineProgram->setUniform("cameraPosition", m_renderer->viewer()->cameraPosition());
+            m_addImpulseLineProgram->setUniform("forceMultiplier", 1.0f);
+            BindImage(m_addImpulseLineProgram, "field_r", m_inkTexture.GetFront(), 0, GL_READ_ONLY);
+            BindImage(m_addImpulseLineProgram, "field_w", m_inkTexture.GetBack(), 1, GL_WRITE_ONLY);
+            Compute(m_addImpulseLineProgram);
+            m_inkTexture.SwapBuffers();*/
+        },
+        [this](std::monostate) {}
+    }, m_impulseState);
+
+    if (m_inkVariables.Boundaries)
+    {
+        SetBounds(m_inkTexture, 0);
+    }
+
+    static const glm::vec2 InkRange{0.0f, 1.0f};
+    RenderToDebugFramebuffer("Ink", m_inkTexture.GetFront(), m_inkVariables.DebugFramebufferDepth, InkRange);
 }
 
 void FluidSim::CallDebugMethods(const CStdTexture3D& texture, const GLuint depth, std::string location) {
@@ -409,28 +473,64 @@ void FluidSim::display()
     if (ImGui::BeginMenu("FluidSim"))
     {
         int sliderFlags{0};
-        bool clamp{false};
+        static bool clamp{false};
         ImGui::Checkbox("Clamp", &clamp);
         if (clamp)
         {
             sliderFlags = ImGuiSliderFlags_AlwaysClamp;
         }
 
+        ImGui::Checkbox("Do Droplets", &m_variables.DoDroplets);
+
+        const auto defaultVariables = [sliderFlags, this](Variables& variables)
+        {
+            ImGui::SliderFloat("Dissipation", &variables.Dissipation, 0.9f, 1.0f, "%.5f", sliderFlags);
+            ImGui::SliderFloat("Viscosity", &variables.Viscosity, 0.001f, 0.15f, "%.5f", sliderFlags);
+            ImGui::Checkbox("Boundaries", &variables.Boundaries);
+            ImGui::Separator();
+        };
+
+        if (ImGui::BeginMenu("Velocity"))
+        {
+            defaultVariables(m_variables);
+            ImGui::SliderFloat("Gravity", &m_variables.Gravity, 0.0f, 30.0f, "%.3f", sliderFlags);
+            ImGui::SliderFloat("GlobalGravity", &m_variables.GlobalGravity, 0.0f, 30.0f, "%.3f", sliderFlags);
+            ImGui::SliderInt("Depth", &m_variables.DebugFramebuffer.Depth, 0, m_cubeDimensions[2] - 1, "%d", ImGuiSliderFlags_AlwaysClamp);
+            ImGui::DragFloatRange2("Range", &m_variables.DebugFramebuffer.Range.x, &m_variables.DebugFramebuffer.Range.y, 1.0f, -128.0f, 128.0f, "%.3f", nullptr, ImGuiSliderFlags_AlwaysClamp);
+            ImGui::SliderFloat("SplatRadius", &m_variables.SplatRadius, 1.0f, (m_cubeDimensions[0] / 5.0f) * 4.0f, "%.5f", sliderFlags);
+		    ImGui::SliderFloat("ForceMultiplier", &m_variables.ForceMultiplier, 0.1f, 5.0f);
+
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Ink"))
+        {
+            ImGui::Checkbox("DoInk", &m_inkVariables.DoInk);
+
+            if (!m_inkVariables.DoInk)
+            {
+                ImGui::BeginDisabled();
+            }
+
+            defaultVariables(m_inkVariables);
+            ImGui::SliderInt("Depth", &m_inkVariables.DebugFramebufferDepth, 0, m_cubeDimensions[2] - 1, "%d", ImGuiSliderFlags_AlwaysClamp);
+            ImGui::Separator();
+            ImGui::Checkbox("RainbowMode", &m_inkVariables.RainbowMode);
+            ImGui::SliderFloat("InkVolume", &m_inkVariables.InkVolume, 1.0f, (m_cubeDimensions[0] / 5.0f) * 4.0f, "%.5f", sliderFlags);
+            ImGui::Separator();
+            ImGui::ColorEdit4("InkColor", glm::value_ptr(m_inkVariables.InkColor));
+            ImGui::Separator();
+
+            if (!m_inkVariables.DoInk)
+            {
+                ImGui::EndDisabled();
+            }
+
+            ImGui::EndMenu();
+        }
+
         ImGui::Separator();
 
-		//ImGui::ColorEdit3("Background", glm::value_ptr(m_backgroundColor));
-		ImGui::SliderFloat("Dissipation", &m_variables.Dissipation, 0.9f, 1.0f, "%.5f", sliderFlags);
-		ImGui::SliderFloat("Gravity", &m_variables.Gravity, 0.0f, 30.0f, "%.3f", sliderFlags);
-        ImGui::SliderFloat("GlobalGravity", &m_variables.GlobalGravity, 0.0f, 30.0f, "%.3f", sliderFlags);
-		ImGui::SliderFloat("Viscosity", &m_variables.Viscosity, 0.001f, 0.15f, "%.5f", sliderFlags);
-        ImGui::SliderFloat("SplatRadius", &m_variables.SplatRadius, 1.0f, (m_cubeDimensions[0] / 5.0f) * 4.0f, "%.5f", sliderFlags);
-
-		ImGui::SliderFloat("ForceMultiplier", &m_variables.ForceMultiplier, 0.1f, 5.0f);
-		ImGui::Checkbox("Boundaries", &m_variables.Boundaries);
-
-        ImGui::Separator();
-        ImGui::SliderInt("Depth", &m_variables.DebugFramebuffer.Depth, 0, m_cubeDimensions[2] - 1, "%d", ImGuiSliderFlags_AlwaysClamp);
-        ImGui::DragFloatRange2("Range", &m_variables.DebugFramebuffer.Range.x, &m_variables.DebugFramebuffer.Range.y, 1.0f, -128.0f, 128.0f, "%.3f", nullptr, ImGuiSliderFlags_AlwaysClamp);
 
         //ImGui::Separator();
         //ImGui::Checkbox("Mouse input", &m_wantsMouseInput);
@@ -567,19 +667,26 @@ glm::vec3 FluidSim::RandomPosition() const
     return { std::rand() % m_cubeDimensions[0], std::rand() % m_cubeDimensions[1], std::rand() % m_cubeDimensions[2] };
 }
 
-void FluidSim::RenderToDebugFramebuffer(CStdFramebuffer &debugFramebuffer, const CStdTexture3D &texture)
+void FluidSim::RenderToDebugFramebuffer(std::string_view debugFramebuffer, const CStdTexture3D &texture)
 {
-    debugFramebuffer.Bind();
+    RenderToDebugFramebuffer(debugFramebuffer, texture, m_variables.DebugFramebuffer.Depth, m_variables.DebugFramebuffer.Range);
+}
+
+void FluidSim::RenderToDebugFramebuffer(std::string_view debugFramebuffer, const CStdTexture3D &texture, const std::int32_t depth, const glm::vec2 &range)
+{
+    CStdFramebuffer &framebuffer{m_debugFramebuffers.at(debugFramebuffer)};
+
+    framebuffer.Bind();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     m_renderPlaneProgram->use();
     texture.Bind(0);
-    m_renderPlaneProgram->setUniform("depth", static_cast<float>(m_variables.DebugFramebuffer.Depth));
-    m_renderPlaneProgram->setUniform("range", m_variables.DebugFramebuffer.Range);
+    m_renderPlaneProgram->setUniform("depth", static_cast<float>(depth));
+    m_renderPlaneProgram->setUniform("range", range);
     m_quad.Bind();
 
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     m_quad.Draw();
-    debugFramebuffer.Unbind();
+    framebuffer.Unbind();
 }
 
 }

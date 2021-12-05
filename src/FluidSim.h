@@ -38,11 +38,18 @@ namespace dynamol
         struct Variables
         {
             float Dissipation{ 0.90f }; // { 0.995f };
-            float Gravity{ 1.0f }; // { 8.0f };
             float Viscosity{ 0.05f }; // { 0.05f };
-            float GlobalGravity{ 0.0f };
-            bool HasSeeded{ false };
             bool Boundaries{ true };
+
+            static constexpr std::size_t NumJacobiRounds{ 20 }; // 40
+            static constexpr std::size_t NumJacobiRoundsDiffusion{ 10 }; // 20
+        };
+
+        struct VelocityVariables : public Variables
+        {
+            float Gravity{ 1.0f }; // { 8.0f };
+            float GlobalGravity{ 0.0f };
+            bool DoDroplets{ true };
             float ForceMultiplier{ 1.0f };
             float SplatRadius{ 20.0f };
 
@@ -51,9 +58,15 @@ namespace dynamol
                 std::int32_t Depth{ 0 };
                 glm::vec2 Range { -128.0f, 128.0f };
             } DebugFramebuffer;
+        };
 
-            static constexpr std::size_t NumJacobiRounds{ 20 }; // 40
-            static constexpr std::size_t NumJacobiRoundsDiffusion{ 10 }; // 20
+        struct InkVariables : public Variables
+        {
+            bool DoInk { false };
+            bool RainbowMode{ false };
+            glm::vec4 InkColor{ 1.0f, 1.0f, 1.0f, 1.0f };
+            float InkVolume { 20.0f };
+            std::int32_t DebugFramebufferDepth { 0 };
         };
 
     public:
@@ -62,6 +75,7 @@ namespace dynamol
 
     public:
         void Execute();
+        void DoInk();
         const CStdTexture3D &GetVelocityTexture() const;
         bool WantsMouseInput() const { return m_wantsMouseInput; }
         void DisplayDebugTextures();
@@ -83,10 +97,12 @@ namespace dynamol
         void DebugNanCheck(const CStdTexture3D &texture, GLuint depth);
         void CallDebugMethods(const CStdTexture3D& texture, const GLuint depth, std::string location);
         glm::vec3 RandomPosition() const;
-        void RenderToDebugFramebuffer(CStdFramebuffer &debugFramebuffer, const CStdTexture3D &texture);
+        void RenderToDebugFramebuffer(std::string_view debugFramebuffer, const CStdTexture3D &texture);
+        void RenderToDebugFramebuffer(std::string_view debugFramebuffer, const CStdTexture3D &texture, std::int32_t depth, const glm::vec2 &range);
 
     private:
-        Variables m_variables;
+        VelocityVariables m_variables;
+        InkVariables m_inkVariables;
         Renderer *m_renderer;
         std::array<std::int32_t, 2> m_windowDimensions;
         std::array<std::int32_t, 3> m_cubeDimensions;
@@ -111,6 +127,9 @@ namespace dynamol
         CStdSwappableTexture3D m_pressureTexture; // TODO: Pressure only needs 1 channel
         CStdTexture3D m_divergenceTexture;
         CStdTexture3D m_temporaryTexture;
+
+        CStdSwappableTexture3D m_inkTexture;
+
         std::map<std::string_view, CStdFramebuffer> m_debugFramebuffers;
         CStdTexture3D m_debugBoundaryTexture;
         CStdRectangle m_quad;
