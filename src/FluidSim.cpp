@@ -23,16 +23,17 @@ namespace
 namespace dynamol
 {
 
-FluidSim::FluidSim(Renderer *const renderer, const std::array<std::int32_t, 2> &windowDimensions, const std::array<std::int32_t, 3> &minimumCubeDimensions)
+FluidSim::FluidSim(Renderer *const renderer, const std::array<std::int32_t, 2> &windowDimensions, const std::array<std::int32_t, 3> &cubeDimensions)
     : Interactor{renderer->viewer()},
       m_renderer{renderer},
       m_timerQuery{std::make_unique<globjects::Query>()},
 	  m_windowDimensions{windowDimensions},
-	  m_cubeDimensions{DetermineCubeDimensions(minimumCubeDimensions)},
+	  m_cubeDimensions{cubeDimensions},
       m_velocityTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true},
       m_pressureTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true },
       m_divergenceTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true },
 	  m_temporaryTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true },
+      m_debugBoundaryTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true },
       m_gridScale{1.0f/128.f},
       m_dt{0},
       m_lastTime{0},
@@ -43,22 +44,24 @@ FluidSim::FluidSim(Renderer *const renderer, const std::array<std::int32_t, 2> &
       m_captureState{false},
       m_checkNan{false}
 {
-    m_debugFramebuffers.emplace_back(DebugFramebuffer{"initial", {windowDimensions[0], windowDimensions[1]}});
-    m_debugFramebuffers.emplace_back(DebugFramebuffer{"After Advection", {windowDimensions[0], windowDimensions[1]}});
-    m_debugFramebuffers.emplace_back(DebugFramebuffer{"After Diffusion", {windowDimensions[0], windowDimensions[1]}});
-    m_debugFramebuffers.emplace_back(DebugFramebuffer{"Result", {windowDimensions[0], windowDimensions[1]}});
+    m_debugFramebuffers.emplace(std::string_view{"Initial"}, CStdFramebuffer{windowDimensions[0], windowDimensions[1]});
+    m_debugFramebuffers.emplace(std::string_view{"After Advection"}, CStdFramebuffer{windowDimensions[0], windowDimensions[1]});
+    m_debugFramebuffers.emplace(std::string_view{"After Diffusion"}, CStdFramebuffer{windowDimensions[0], windowDimensions[1]});
+    m_debugFramebuffers.emplace(std::string_view{"Result"}, CStdFramebuffer{windowDimensions[0], windowDimensions[1]});
+    m_debugFramebuffers.emplace(std::string_view{"Boundary"}, CStdFramebuffer{windowDimensions[0], windowDimensions[1]});
 
     m_velocityTexture.SetObjectLabel("velocity");
     m_pressureTexture.SetObjectLabel("pressure");
     m_divergenceTexture.SetObjectLabel("divergence");
     m_temporaryTexture.SetObjectLabel("temporary");
+    m_debugBoundaryTexture.SetObjectLabel("debugBoundary");
     LoadShaders();
 
-    for (const auto &framebuffer : m_debugFramebuffers)
+    for (const auto &it : m_debugFramebuffers)
     {
-        framebuffer.framebuffer.Bind();
+        it.second.Bind();
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-        framebuffer.framebuffer.Unbind();
+        it.second.Unbind();
     }
 }
 
@@ -73,7 +76,7 @@ void FluidSim::Execute()
     //m_dt = 0.02;
     m_lastTime = now;
 
-    DoDroplets();
+    //DoDroplets();
 
     m_timerQuery->begin(GL_TIME_ELAPSED);
 
@@ -104,7 +107,7 @@ void FluidSim::Execute()
     /*
         Debug Start
     */
-    RenderToDebugFramebuffer(m_debugFramebuffers[0], m_velocityTexture.GetFront());
+    RenderToDebugFramebuffer(m_debugFramebuffers["Initial"], m_velocityTexture.GetFront());
     CallDebugMethods(m_velocityTexture.GetFront(), 50, "Advection");
 
 #pragma region Advection
@@ -123,7 +126,7 @@ void FluidSim::Execute()
     /*
         Debug Advection
     */
-    RenderToDebugFramebuffer(m_debugFramebuffers[1], m_velocityTexture.GetFront());
+    RenderToDebugFramebuffer(m_debugFramebuffers["After Advection"], m_velocityTexture.GetFront());
     CallDebugMethods(m_velocityTexture.GetFront(), 50, "Diffuse");
 
 #pragma region Diffuse
@@ -134,7 +137,7 @@ void FluidSim::Execute()
     /*
         Debug Diffuse
     */
-    RenderToDebugFramebuffer(m_debugFramebuffers[2], m_velocityTexture.GetFront());
+    RenderToDebugFramebuffer(m_debugFramebuffers["After Diffusion"], m_velocityTexture.GetFront());
     CallDebugMethods(m_velocityTexture.GetFront(), 50, "Impulse");
 
 #pragma region Impulse
@@ -254,6 +257,7 @@ void FluidSim::Execute()
     if (m_variables.Boundaries)
     {
         SetBounds(m_velocityTexture, -1);
+        RenderToDebugFramebuffer(m_debugFramebuffers["Boundary"], m_debugBoundaryTexture);
     }
 
     /*
@@ -291,7 +295,7 @@ void FluidSim::Execute()
     }
 #pragma endregion
 
-    RenderToDebugFramebuffer(m_debugFramebuffers[3], m_velocityTexture.GetFront());
+    RenderToDebugFramebuffer(m_debugFramebuffers["Result"], m_velocityTexture.GetFront());
 }
 
 void FluidSim::CallDebugMethods(const CStdTexture3D& texture, const GLuint depth, std::string location) {
@@ -354,14 +358,27 @@ void FluidSim::DebugNanCheck(const CStdTexture3D& texture, const GLuint depth)
     }
 }
 
-const std::vector<FluidSim::DebugFramebuffer> &FluidSim::GetDebugFramebuffers() const
-{
-    return m_debugFramebuffers;
-}
-
 const CStdTexture3D &FluidSim::GetVelocityTexture() const
 {
     return m_velocityTexture.GetFront();
+}
+
+void FluidSim::DisplayDebugTextures()
+{
+    const auto display = [](std::string_view name, const CStdTexture<GL_TEXTURE_2D, 2> &texture)
+    {
+		ImGui::Begin(name.data());
+
+		const std::uint64_t textureHandle{texture.GetTexture()};
+		ImGui::Image(reinterpret_cast<ImTextureID>(textureHandle), ImGui::GetContentRegionAvail());
+
+		ImGui::End();
+    };
+
+    for (const auto &[name, framebuffer] : m_debugFramebuffers)
+    {
+        display(name, framebuffer.GetTexture());
+    }
 }
 
 void FluidSim::keyEvent(const int key, const int scancode, const int action, const int mods)
@@ -421,21 +438,11 @@ void FluidSim::display()
 	}
 }
 
-std::array<std::int32_t, 3> FluidSim::DetermineCubeDimensions(std::array<std::int32_t, 3> minimumCubeDimensions)
-{
-    for (std::size_t i{0}; i < 3; ++i)
-    {
-        minimumCubeDimensions[i] = (minimumCubeDimensions[i] / WorkGroupSize[i] + 1) * WorkGroupSize[i];
-    }
-
-    return minimumCubeDimensions;
-}
-
 void FluidSim::LoadShaders()
 {
     static constexpr auto FormatString = "layout(local_size_x=%d, local_size_y=%d, local_size_z=%d)";
     std::array<char, 1024> buffer;
-    std::snprintf(buffer.data(), buffer.size(), FormatString, WorkGroupSize[0], WorkGroupSize[1], WorkGroupSize[2]);
+    std::snprintf(buffer.data(), buffer.size(), FormatString, Scene::WorkGroupSize[0], Scene::WorkGroupSize[1], Scene::WorkGroupSize[2]);
     globjects::Shader::globalReplace("layout(local_size_x=1, local_size_y=1, local_size_z=1)", buffer.data());
     globjects::Shader::globalReplace("layout(rgba16_snorm", "layout(rgba32f"); //potentially comment this out
     globjects::Shader::globalReplace("layout(r16_snorm", "layout(r32f");
@@ -485,7 +492,7 @@ void FluidSim::Compute(globjects::Program *const program)
 {
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     // Workgroups (2048 CUDA cores)
-    program->dispatchCompute(m_cubeDimensions[0] / WorkGroupSize[0], m_cubeDimensions[1] / WorkGroupSize[1], m_cubeDimensions[2] / WorkGroupSize[2]);
+    program->dispatchCompute(m_cubeDimensions[0] / Scene::WorkGroupSize[0], m_cubeDimensions[1] / Scene::WorkGroupSize[1], m_cubeDimensions[2] / Scene::WorkGroupSize[2]);
 }
 
 void FluidSim::SolvePoissonSystem(CStdSwappableTexture3D& swappableTexture, const CStdTexture3D& initialValue, const float alpha, const float beta, const bool isProject)
@@ -523,6 +530,7 @@ void FluidSim::SetBounds(CStdSwappableTexture3D& texture, const float scale)
     // m_boundaryProgram->setUniform("box_size", glm::vec3{ static_cast<float>(m_cubeDimensions[0]), static_cast<float>(m_cubeDimensions[1]), static_cast<float>(m_cubeDimensions[2]) });
     BindImage(m_boundaryProgram, "field_r", texture.GetFront(), 0, GL_READ_ONLY);
     BindImage(m_boundaryProgram, "field_w", texture.GetBack(), 1, GL_WRITE_ONLY);
+    BindImage(m_boundaryProgram, "debug_w", m_debugBoundaryTexture, 2, GL_WRITE_ONLY);
     Compute(m_boundaryProgram);
     texture.SwapBuffers();
 }
@@ -559,9 +567,9 @@ glm::vec3 FluidSim::RandomPosition() const
     return { std::rand() % m_cubeDimensions[0], std::rand() % m_cubeDimensions[1], std::rand() % m_cubeDimensions[2] };
 }
 
-void FluidSim::RenderToDebugFramebuffer(DebugFramebuffer &debugFramebuffer, const CStdTexture3D &texture)
+void FluidSim::RenderToDebugFramebuffer(CStdFramebuffer &debugFramebuffer, const CStdTexture3D &texture)
 {
-    debugFramebuffer.framebuffer.Bind();
+    debugFramebuffer.Bind();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     m_renderPlaneProgram->use();
     texture.Bind(0);
@@ -571,7 +579,7 @@ void FluidSim::RenderToDebugFramebuffer(DebugFramebuffer &debugFramebuffer, cons
 
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     m_quad.Draw();
-    debugFramebuffer.framebuffer.Unbind();
+    debugFramebuffer.Unbind();
 }
 
 }

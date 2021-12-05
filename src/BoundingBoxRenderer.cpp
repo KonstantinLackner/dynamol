@@ -85,8 +85,8 @@ void BoundingBoxRenderer::display()
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	mat4 boundingBoxTransform;
-	boundingBoxTransform = scale(0.5f * (viewer()->scene()->protein()->maximumBounds() - viewer()->scene()->protein()->minimumBounds()));
-	boundingBoxTransform = translate(0.5f * (viewer()->scene()->protein()->maximumBounds() + viewer()->scene()->protein()->minimumBounds())) * boundingBoxTransform;
+	boundingBoxTransform = scale(0.5f * (viewer()->scene()->maximumBounds() - viewer()->scene()->minimumBounds()));
+	boundingBoxTransform = translate(0.5f * (viewer()->scene()->maximumBounds() + viewer()->scene()->minimumBounds())) * boundingBoxTransform;
 
 	mat4 modelViewTransform = viewer()->modelViewTransform() * boundingBoxTransform;
 

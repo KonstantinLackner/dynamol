@@ -58,10 +58,9 @@ Viewer::Viewer(GLFWwindow *window, Scene *scene) : m_window(window), m_scene(sce
 	std::int32_t width;
 	std::int32_t height;
 	glfwGetWindowSize(window, &width, &height);
-	const glm::vec3 &minBounds{scene->protein()->minimumBounds()};
-	const glm::vec3 &maxBounds{scene->protein()->maximumBounds()};
-	const std::array<std::int32_t, 3> cubeSize{maxBounds.x + 1 - minBounds.x, maxBounds.y + 1 - minBounds.y, maxBounds.z + 1 - minBounds.z};
-	//const std::array<std::int32_t, 3> cubeSize{256, 256, 256};
+	const glm::vec3 &minBounds{scene->minimumBounds()};
+	const glm::vec3 &maxBounds{scene->maximumBounds()};
+	const std::array<std::int32_t, 3> cubeSize{maxBounds.x - minBounds.x, maxBounds.y - minBounds.y, maxBounds.z - minBounds.z};
 
 	m_interactors.emplace_back(std::make_unique<FluidSim>(m_renderers.back().get(), std::array{width, height}, cubeSize));
 	m_fluidSim = static_cast<FluidSim *>(m_interactors.back().get());
@@ -430,15 +429,7 @@ void Viewer::endFrame()
 		m_saveScreenshot = false;
 	}
 
-	for (const auto &debugFramebuffer : m_fluidSim->GetDebugFramebuffers())
-	{
-		ImGui::Begin(debugFramebuffer.name.data());
-
-		const std::uint64_t textureHandle{debugFramebuffer.framebuffer.GetTexture().GetTexture()};
-		ImGui::Image(reinterpret_cast<ImTextureID>(textureHandle), ImGui::GetContentRegionAvail());
-
-		ImGui::End();
-	}
+	m_fluidSim->DisplayDebugTextures();
 
 	if (m_showUi)
 		renderUi();

@@ -536,7 +536,7 @@ public:
 	//void Resize(std::int32_t newWidth, std::int32_t newHeight, CStdGLShaderProgram &copyShader, CStdRectangle &rectangle);
 
 private:
-	static constexpr inline auto InternalFormat = GL_RG16F;
+	static constexpr inline auto InternalFormat = GL_RG32F;
 	static constexpr inline auto Format = GL_RG;
 	static constexpr inline auto Type = GL_FLOAT;
 

@@ -26,8 +26,8 @@ namespace dynamol
 		const std::vector < std::vector<glm::vec4> > & atoms() const;
 		void addAtom(const glm::vec4 &atom);
 		const std::vector<Element> & elements() const;
-		glm::vec3 minimumBounds() const;
-		glm::vec3 maximumBounds() const;
+		//glm::vec3 minimumBounds() const;
+		//glm::vec3 maximumBounds() const;
 
 		const std::vector<glm::vec4> & activeElementColorsRadiiPacked() const;
 		const std::vector<glm::vec4> & activeResidueColorsPacked() const;
@@ -51,6 +51,12 @@ namespace dynamol
 
 		static const std::unordered_map<std::string, glm::uint> & chainIds();
 		static const std::array<glm::vec3, 64> & chainColors();
+
+	protected:
+		glm::vec3 minimumBounds() const;
+		glm::vec3 maximumBounds() const;
+
+		friend class Scene;
 
 	private:
 

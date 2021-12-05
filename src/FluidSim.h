@@ -6,6 +6,7 @@
 #include "Shader.h"
 
 #include <array>
+#include <map>
 #include <memory>
 #include <variant>
 
@@ -55,21 +56,15 @@ namespace dynamol
             static constexpr std::size_t NumJacobiRoundsDiffusion{ 10 }; // 20
         };
 
-        struct DebugFramebuffer
-        {
-            std::string_view name;
-            CStdFramebuffer framebuffer;
-        };
-
     public:
-        FluidSim(Renderer *renderer, const std::array<std::int32_t, 2> &windowDimensions, const std::array<std::int32_t, 3> &minimumCubeDimensions);
+        FluidSim(Renderer *renderer, const std::array<std::int32_t, 2> &windowDimensions, const std::array<std::int32_t, 3> &cubeDimensions);
         ~FluidSim();
 
     public:
         void Execute();
-        const std::vector<DebugFramebuffer> &GetDebugFramebuffers() const;
         const CStdTexture3D &GetVelocityTexture() const;
         bool WantsMouseInput() const { return m_wantsMouseInput; }
+        void DisplayDebugTextures();
 
         virtual void keyEvent(int key, int scancode, int action, int mods) override;
 		virtual void mouseButtonEvent(int button, int action, int mods) override;
@@ -77,7 +72,6 @@ namespace dynamol
         virtual void display() override;
 
     private:
-        std::array<std::int32_t, 3> DetermineCubeDimensions(std::array<std::int32_t, 3> minimumCubeDimensions);
         void LoadShaders();
         void BindImage(globjects::Program *program, std::string_view name, const CStdTexture3D &texture, int value, GLenum access);
         void Compute(globjects::Program *program);
@@ -89,10 +83,9 @@ namespace dynamol
         void DebugNanCheck(const CStdTexture3D &texture, GLuint depth);
         void CallDebugMethods(const CStdTexture3D& texture, const GLuint depth, std::string location);
         glm::vec3 RandomPosition() const;
-        void RenderToDebugFramebuffer(DebugFramebuffer &debugFramebuffer, const CStdTexture3D &texture);
+        void RenderToDebugFramebuffer(CStdFramebuffer &debugFramebuffer, const CStdTexture3D &texture);
 
     private:
-        static constexpr std::array<int32_t, 3> WorkGroupSize{8, 8, 8};
         Variables m_variables;
         Renderer *m_renderer;
         std::array<std::int32_t, 2> m_windowDimensions;
@@ -118,7 +111,8 @@ namespace dynamol
         CStdSwappableTexture3D m_pressureTexture; // TODO: Pressure only needs 1 channel
         CStdTexture3D m_divergenceTexture;
         CStdTexture3D m_temporaryTexture;
-        std::vector<DebugFramebuffer> m_debugFramebuffers;
+        std::map<std::string_view, CStdFramebuffer> m_debugFramebuffers;
+        CStdTexture3D m_debugBoundaryTexture;
         CStdRectangle m_quad;
         float m_dt;
         float m_gridScale;

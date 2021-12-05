@@ -170,8 +170,8 @@ SphereRenderer::SphereRenderer(Viewer* viewer) : Renderer(viewer), Interactor{vi
 		},
 		{ "./res/model/globals.glsl" });
 
-	shaderProgram("transformfeedback")->setUniform("minBounds", viewer->scene()->protein()->minimumBounds());
-	shaderProgram("transformfeedback")->setUniform("maxBounds", viewer->scene()->protein()->maximumBounds());
+	shaderProgram("transformfeedback")->setUniform("minBounds", viewer->scene()->minimumBounds());
+	shaderProgram("transformfeedback")->setUniform("maxBounds", viewer->scene()->maximumBounds());
 
 	m_framebufferSize = viewer->viewportSize();
 
@@ -419,8 +419,8 @@ void SphereRenderer::display()
 	const mat3 normalMatrix = mat3(transpose(inverseModelViewMatrix));
 	const mat3 inverseNormalMatrix = inverse(normalMatrix);
 
-	const vec3 objectCenter = 0.5f * (viewer()->scene()->protein()->maximumBounds() + viewer()->scene()->protein()->minimumBounds());
-	const float objectRadius = 0.5f * length(viewer()->scene()->protein()->maximumBounds() - viewer()->scene()->protein()->minimumBounds());
+	const vec3 objectCenter = 0.5f * (viewer()->scene()->maximumBounds() + viewer()->scene()->minimumBounds());
+	const float objectRadius = 0.5f * length(viewer()->scene()->maximumBounds() - viewer()->scene()->minimumBounds());
 
 	const vec4 projectionInfo(float(-2.0 / (viewportSize.x * projectionMatrix[0][0])),
 		float(-2.0 / (viewportSize.y * projectionMatrix[1][1])),

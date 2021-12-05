@@ -117,15 +117,14 @@ int main(int argc, char *argv[])
 			fileName = std::string(openfileName);
 	}
 	
-	auto scene = std::make_unique<Scene>();
-	scene->protein()->load(fileName);
+	auto scene = std::make_unique<Scene>(fileName);
 	auto viewer = std::make_unique<Viewer>(window, scene.get());
 
 	// Scaling the model's bounding box to the canonical view volume
-	vec3 boundingBoxSize = scene->protein()->maximumBounds() - scene->protein()->minimumBounds();
+	vec3 boundingBoxSize = scene->maximumBounds() - scene->minimumBounds();
 	float maximumSize = std::max( boundingBoxSize.x, std::max(boundingBoxSize.y, boundingBoxSize.z) );
-	mat4 modelTransform =  scale(vec3(2.0f) / vec3(maximumSize)); 
-	modelTransform = modelTransform * translate(-0.5f*(scene->protein()->minimumBounds() + scene->protein()->maximumBounds()));
+	mat4 modelTransform =  scale(vec3(2.0f) / vec3(maximumSize));
+	modelTransform = modelTransform * translate(-0.5f*(scene->minimumBounds() + scene->maximumBounds()));
 	viewer->setModelTransform(modelTransform);
 
 

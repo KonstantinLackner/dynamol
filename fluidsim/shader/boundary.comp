@@ -8,6 +8,9 @@ uniform image3D field_r;
 layout(rgba16_snorm) 
 uniform image3D field_w;
 
+layout(rgba16_snorm)
+uniform image3D debug_w;
+
 uniform float scale;
 uniform vec3 box_size;
 
@@ -18,21 +21,29 @@ void main()
 	ivec3 offset = ivec3(0);
 
 	vec4 value = imageLoad(field_r, coord);
+	vec4 debugValue = vec4(0.0);
 
 	if (coord.x == 0 || coord.x == img_size.x - 1)
 	{
-		value.x *= scale;
+		//value.x *= scale;
+		value.x = 0;
+		debugValue.x = value.x;
 	}
 
 	if (coord.y == 0 || coord.y == img_size.y - 1)
 	{
-		value.y *= scale;
+		//value.y *= scale;
+		value.y = 0;
+		debugValue.y = value.y;
 	}
 
 	if (coord.z == 0 || coord.z == img_size.z - 1)
 	{
-		value.z *= scale;
+		//value.z *= scale;
+		value.z = 0;
+		debugValue.z = value.z;
 	}
 
 	imageStore(field_w, coord, value);
+	imageStore(debug_w, coord, debugValue);
 }

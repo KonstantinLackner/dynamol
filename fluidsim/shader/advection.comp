@@ -62,7 +62,7 @@ void advect_point(ivec3 coord)
         u0 = vec4(0, 0, 0, 0);
     }
 
-    //u0 += vec4(0, -gravity, 0, 0);
+    u0 += vec4(0, -gravity, 0, 0);
     imageStore(quantity_w, coord, u0);
 }
 
