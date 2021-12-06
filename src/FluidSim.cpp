@@ -645,7 +645,7 @@ void FluidSim::DoDroplets()
     if (acc >= nextDrop)
     {
         acc = 0;
-        static constexpr auto Delay = 100.0f; // Should be 1000
+        static constexpr auto Delay = 1000.0f; // Should be 1000
         nextDrop = Delay + std::pow(-1, std::rand() % 2) * (std::rand() % static_cast<int>(0.5 * Delay));
         //LOG_INFO("Next drop: %.2f", next_drop);
 
