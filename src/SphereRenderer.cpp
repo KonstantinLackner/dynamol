@@ -23,6 +23,31 @@ using namespace gl;
 using namespace glm;
 using namespace globjects;
 
+void SphereRenderer::Molecule::addAtom(const glm::vec3 &atom)
+{
+	const auto addToBuffer = [&atom, this](std::unique_ptr<Buffer> &buffer)
+	{
+		auto newBuffer = Buffer::create();
+		newBuffer->setStorage((numberOfAtoms + 1) * sizeof(glm::vec4), nullptr, gl::GL_DYNAMIC_STORAGE_BIT);
+		buffer->copySubData(newBuffer.get(), numberOfAtoms * sizeof(glm::vec4));
+		newBuffer->setSubData(numberOfAtoms * sizeof(glm::vec4), sizeof(glm::vec4), glm::value_ptr(glm::vec4{atom, 0.0f}));
+
+		std::swap(buffer, newBuffer);
+	};
+
+	addToBuffer(vertices.first);
+	addToBuffer(vertices.second);
+	++numberOfAtoms;
+}
+
+SphereRenderer::Molecule::Molecule(const std::vector<glm::vec4> &atoms)
+	: vertices{Buffer::create(), Buffer::create()},
+	  numberOfAtoms{atoms.size()}
+{
+	vertices.first->setStorage(atoms, gl::GL_NONE_BIT);
+	vertices.second->setStorage(atoms.size() * sizeof(glm::vec4), nullptr, gl::GL_NONE_BIT);
+}
+
 std::unique_ptr<Texture> loadTexture(const std::string& filename)
 {
 	int width, height, channels;
@@ -76,7 +101,10 @@ SphereRenderer::SphereRenderer(Viewer* viewer) : Renderer(viewer), Interactor{vi
 {
 	Shader::hintIncludeImplementation(Shader::IncludeImplementation::Fallback);
 
-	initBuffers();
+	for (const auto &i : viewer->scene()->protein()->atoms())
+	{
+		m_molecules.emplace_back(i);
+	}
 
 	m_elementColorsRadii->setStorage(viewer->scene()->protein()->activeElementColorsRadiiPacked(), gl::GL_NONE_BIT);
 	m_residueColors->setStorage(viewer->scene()->protein()->activeResidueColorsPacked(), gl::GL_NONE_BIT);
@@ -363,9 +391,7 @@ void SphereRenderer::display()
 	// SaveOpenGL state
 	auto currentState = State::currentState();
 
-	static float resolutionScale = 1.0f;
-
-	const ivec2 viewportSize = ivec2(vec2(viewer()->viewportSize()) * resolutionScale);
+	const ivec2 viewportSize = ivec2(vec2(viewer()->viewportSize()) * m_resolutionScale);
 
 	// Resize all FBOs if the viewport size has changed
 	if (viewportSize != m_framebufferSize)
@@ -475,7 +501,7 @@ void SphereRenderer::display()
 	// user interface for manipulating rendering parameters
 	if (ImGui::BeginMenu("Renderer"))
 	{
-		ImGui::SliderFloat("Resolution Scale", &resolutionScale, 0.25f, 8.0f);
+		ImGui::SliderFloat("Resolution Scale", &m_resolutionScale, 0.25f, 8.0f);
 
 		if (ImGui::CollapsingHeader("Lighting"))
 		{
@@ -617,13 +643,14 @@ void SphereRenderer::display()
 	const float radiusScale = sqrtf(log(contributingAtoms * exp(sharpness)) / sharpness);
 
 	// Properties for animation
-	const uint timestepCount = (uint)viewer()->scene()->protein()->atoms().size();
+	const uint timestepCount = (uint)m_molecules.size();
 	const float animationTime = animate ? float(glfwGetTime()) : -1.0f;
 	const float currentTime = glfwGetTime() * animationFrequency;
 	const uint currentTimestep = uint(currentTime) % timestepCount;
 	const uint nextTimestep = (currentTimestep + 1) % timestepCount;
 	const float animationDelta = currentTime - floor(currentTime);
-	const int vertexCount = int(viewer()->scene()->protein()->atoms()[currentTimestep].size());
+	auto &selectedMolecule{m_molecules[currentTimestep]};
+	const int vertexCount = int(selectedMolecule.numberOfAtoms);
 
 	// Defines for enabling/disabling shader feature based on parameter setting
 	std::string defines = "";
@@ -664,8 +691,7 @@ void SphereRenderer::display()
 
 	// Read buffer from fluidsim
 	// Vertex binding setup
-	const globjects::Buffer *const buffer{m_transformedCoordinates.first.get()};
-	//const globjects::Buffer *const buffer{m_vertices[currentTimestep].get()};
+	const globjects::Buffer *const buffer{selectedMolecule.vertices.first.get()};
 	auto vertexBinding = m_vao->binding(0);
 	vertexBinding->setAttribute(0);
 	vertexBinding->setBuffer(buffer, 0, sizeof(vec4));
@@ -675,7 +701,7 @@ void SphereRenderer::display()
 
 	glEnable(GL_RASTERIZER_DISCARD);
 
-	m_transformedCoordinates.second->bindBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0);
+	selectedMolecule.vertices.second->bindBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0);
 	//viewer()->fluidSim()->GetVelocityTexture().BindImage(0, GL_READ_ONLY);
 	viewer()->fluidSim()->GetVelocityTexture().Bind(0);
 	programTransformFeedback->use();
@@ -692,9 +718,9 @@ void SphereRenderer::display()
 	glDisable(GL_RASTERIZER_DISCARD);
 	glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, 0);
 
-	vertexBinding->setBuffer(m_transformedCoordinates.second.get(), 0, sizeof(glm::vec4));
+	vertexBinding->setBuffer(selectedMolecule.vertices.second.get(), 0, sizeof(glm::vec4));
 
-	std::swap(m_transformedCoordinates.first, m_transformedCoordinates.second);
+	std::swap(selectedMolecule.vertices.first, selectedMolecule.vertices.second);
 
 	/* Used for interploation, which is not active
 	if (timestepCount > 0)
@@ -1167,28 +1193,40 @@ void SphereRenderer::mouseButtonEvent(const int button, const int action, const 
 	double x;
 	double y;
 	glfwGetCursorPos(viewer()->window(), &x, &y);
-	// TODO: camera matrix handling
 
-	addPoint(x, y);
-}
+	const auto viewportSize = glm::floor(static_cast<glm::vec2>(viewer()->viewportSize()) * m_resolutionScale);
 
-void SphereRenderer::addPoint(const double x, const double y)
-{
-	viewer()->scene()->protein()->addAtom({x, y, 300.0, 0});
+    y = viewportSize.y - y;
 
-	initBuffers();
-}
+	const auto halfWindowWidth = viewportSize.x / 2;
+	const auto halfWindowHeight = viewportSize.y / 2;
 
-void SphereRenderer::initBuffers()
-{
-	m_vertices.clear();
-	for (const auto &i : viewer()->scene()->protein()->atoms())
+	const glm::vec4 screenCoords{
+		static_cast<float>((x - halfWindowWidth) / halfWindowWidth),
+		static_cast<float>((y - halfWindowHeight) / halfWindowWidth),
+		-2,
+		1
+		};
+
+	glm::vec4 pickCoords{glm::inverse(viewer()->modelViewProjectionTransform()) * screenCoords};
+	pickCoords /= pickCoords.w;
+	const glm::vec3 &minimumBounds{viewer()->scene()->minimumBounds()};
+	const glm::vec3 &maximumBounds{viewer()->scene()->maximumBounds()};
+	const glm::vec3 coords{pickCoords.x, pickCoords.y, (minimumBounds.z + maximumBounds.z) / 2};
+
+
+	// Out of bounds?
+	if (coords.x < minimumBounds.x || coords.x > maximumBounds.x
+		|| coords.y < minimumBounds.y || coords.y > maximumBounds.y)
+		/*|| coords.z < minimumBounds.z || coords.z > maximumBounds.z*/
 	{
-		m_vertices.push_back(Buffer::create());
-		m_vertices.back()->setStorage(i, gl::GL_NONE_BIT);
+		return;
 	}
 
-	m_transformedCoordinates = {Buffer::create(), Buffer::create()};
-	m_transformedCoordinates.first->setStorage(viewer()->scene()->protein()->atoms()[0], GL_NONE_BIT);
-	m_transformedCoordinates.second->setStorage(viewer()->scene()->protein()->atoms()[0].size() * sizeof(glm::vec4), nullptr, GL_NONE_BIT);
+	// TODO: camera matrix handling
+
+	for (auto &molecule : m_molecules)
+	{
+		molecule.addAtom(coords);
+	}
 }

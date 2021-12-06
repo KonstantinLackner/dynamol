@@ -28,6 +28,17 @@ namespace dynamol
 
 	class SphereRenderer : public Renderer, public Interactor
 	{
+	private:
+		struct Molecule
+		{
+			std::pair<std::unique_ptr<globjects::Buffer>, std::unique_ptr<globjects::Buffer>> vertices;
+			std::size_t numberOfAtoms;
+
+			Molecule(const std::vector<glm::vec4> &atoms);
+
+			void addAtom(const glm::vec3 &atom);
+		};
+
 	public:
 		SphereRenderer(Viewer *viewer);
 
@@ -37,12 +48,8 @@ namespace dynamol
 
 		virtual void mouseButtonEvent(int button, int action, int mods);
 
-		void addPoint(double x, double y);
-
 	private:
-		void initBuffers();
-		
-		std::vector< std::unique_ptr<globjects::Buffer> > m_vertices;
+		std::vector<Molecule> m_molecules;
 		std::unique_ptr<globjects::VertexArray> m_vao = std::make_unique<globjects::VertexArray>();
 		std::unique_ptr<globjects::Buffer> m_elementColorsRadii = std::make_unique<globjects::Buffer>();
 		std::unique_ptr<globjects::Buffer> m_residueColors = std::make_unique<globjects::Buffer>();
@@ -85,10 +92,10 @@ namespace dynamol
 		std::vector< std::unique_ptr<globjects::Texture> > m_bumpTextures;
 
 		std::unique_ptr<globjects::TransformFeedback> m_transformFeedback = nullptr;
-		std::pair<std::unique_ptr<globjects::Buffer>, std::unique_ptr<globjects::Buffer>> m_transformedCoordinates;
 
 		glm::ivec2 m_shadowMapSize = glm::ivec2(512, 512);
 		glm::ivec2 m_framebufferSize;
+		float m_resolutionScale{1.0f};
 	};
 
 }

@@ -459,8 +459,8 @@ void FluidSim::keyEvent(const int key, const int scancode, const int action, con
 
 void FluidSim::mouseButtonEvent(const int button, const int action, const int mods)
 {
-    //if (button != GLFW_MOUSE_BUTTON_LEFT) return;
-    //m_mouseButtonPressed = action == GLFW_PRESS;
+    if (button != GLFW_MOUSE_BUTTON_LEFT) return;
+    m_mouseButtonPressed = action == GLFW_PRESS;
 }
 
 void FluidSim::cursorPosEvent(const double x, const double y)

@@ -47,7 +47,7 @@ namespace dynamol
 
         struct VelocityVariables : public Variables
         {
-            float Gravity{ 1.0f }; // { 8.0f };
+            float Gravity{ 0.0f }; // { 8.0f };
             float GlobalGravity{ 0.0f };
             bool DoDroplets{ true };
             float ForceMultiplier{ 1.0f };
