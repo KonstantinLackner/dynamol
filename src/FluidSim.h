@@ -8,6 +8,7 @@
 #include <array>
 #include <map>
 #include <memory>
+#include <tuple>
 #include <variant>
 
 #include <glm/glm.hpp>
@@ -69,6 +70,11 @@ namespace dynamol
             std::int32_t DebugFramebufferDepth { 0 };
         };
 
+        struct DebugVariables
+        {
+            
+        };
+
     public:
         FluidSim(Renderer *renderer, const std::array<std::int32_t, 2> &windowDimensions, const std::array<std::int32_t, 3> &cubeDimensions);
         ~FluidSim();
@@ -127,7 +133,7 @@ namespace dynamol
 
         CStdSwappableTexture3D m_inkTexture;
 
-        std::map<std::string_view, CStdFramebuffer> m_debugFramebuffers;
+        std::map<std::string_view, std::pair<bool, CStdFramebuffer>> m_debugFramebuffers;
         CStdTexture3D m_debugBoundaryTexture;
         CStdRectangle m_quad;
         float m_dt;

@@ -33,7 +33,6 @@ FluidSim::FluidSim(Renderer *const renderer, const std::array<std::int32_t, 2> &
       m_divergenceTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true },
 	  m_temporaryTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true },
       m_inkTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true },
-      m_debugBoundaryTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true },
       m_gridScale{1.0f/128.f},
       m_dt{0},
       m_lastTime{0},
@@ -42,26 +41,23 @@ FluidSim::FluidSim(Renderer *const renderer, const std::array<std::int32_t, 2> &
       m_captureState{false},
       m_checkNan{false}
 {
-    m_debugFramebuffers.emplace(std::string_view{"Initial"}, CStdFramebuffer{windowDimensions[0], windowDimensions[1]});
-    m_debugFramebuffers.emplace(std::string_view{"After Advection"}, CStdFramebuffer{windowDimensions[0], windowDimensions[1]});
-    m_debugFramebuffers.emplace(std::string_view{"After Diffusion"}, CStdFramebuffer{windowDimensions[0], windowDimensions[1]});
-    m_debugFramebuffers.emplace(std::string_view{"Result"}, CStdFramebuffer{windowDimensions[0], windowDimensions[1]});
-    m_debugFramebuffers.emplace(std::string_view{"Boundary"}, CStdFramebuffer{windowDimensions[0], windowDimensions[1]});
-    m_debugFramebuffers.emplace(std::string_view{"Ink"}, CStdFramebuffer{windowDimensions[0], windowDimensions[1]});
+    for (auto *const name : {"Initial", "After Advection", "After Diffusion", "Result", "Ink"})
+    {
+        m_debugFramebuffers[name] = {false, CStdFramebuffer{windowDimensions[0], windowDimensions[1]}};
+    }
 
     m_velocityTexture.SetObjectLabel("velocity");
     m_pressureTexture.SetObjectLabel("pressure");
     m_divergenceTexture.SetObjectLabel("divergence");
     m_temporaryTexture.SetObjectLabel("temporary");
     m_inkTexture.SetObjectLabel("ink");
-    m_debugBoundaryTexture.SetObjectLabel("debugBoundary");
     LoadShaders();
 
     for (const auto &it : m_debugFramebuffers)
     {
-        it.second.Bind();
+        it.second.second.Bind();
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-        it.second.Unbind();
+        it.second.second.Unbind();
     }
 }
 
@@ -211,7 +207,6 @@ void FluidSim::Execute()
     if (m_variables.Boundaries)
     {
         SetBounds(m_velocityTexture, -1);
-        RenderToDebugFramebuffer("Boundary", m_debugBoundaryTexture);
     }
 
     /*
@@ -374,9 +369,12 @@ void FluidSim::DisplayDebugTextures()
 		ImGui::End();
     };
 
-    for (const auto &[name, framebuffer] : m_debugFramebuffers)
+    for (const auto &[name, framebufferState] : m_debugFramebuffers)
     {
-        display(name, framebuffer.GetTexture());
+        if (framebufferState.first)
+        {
+            display(name, framebufferState.second.GetTexture());
+        }
     }
 }
 
@@ -453,7 +451,15 @@ void FluidSim::display()
             ImGui::EndMenu();
         }
 
-        ImGui::Separator();
+        if (ImGui::BeginMenu("Debug Framebuffers"))
+        {
+            for (auto &[name, framebufferState] : m_debugFramebuffers)
+            {
+                ImGui::Checkbox(name.data(), &framebufferState.first);
+            }
+
+            ImGui::EndMenu();
+        }
 
 		ImGui::EndMenu();
 	}
@@ -551,7 +557,6 @@ void FluidSim::SetBounds(CStdSwappableTexture3D& texture, const float scale)
     // m_boundaryProgram->setUniform("box_size", glm::vec3{ static_cast<float>(m_cubeDimensions[0]), static_cast<float>(m_cubeDimensions[1]), static_cast<float>(m_cubeDimensions[2]) });
     BindImage(m_boundaryProgram, "field_r", texture.GetFront(), 0, GL_READ_ONLY);
     BindImage(m_boundaryProgram, "field_w", texture.GetBack(), 1, GL_WRITE_ONLY);
-    BindImage(m_boundaryProgram, "debug_w", m_debugBoundaryTexture, 2, GL_WRITE_ONLY);
     Compute(m_boundaryProgram);
     texture.SwapBuffers();
 }
@@ -592,7 +597,8 @@ void FluidSim::RenderToDebugFramebuffer(std::string_view debugFramebuffer, const
 
 void FluidSim::RenderToDebugFramebuffer(std::string_view debugFramebuffer, const CStdTexture3D &texture, const std::int32_t depth, const glm::vec2 &range)
 {
-    CStdFramebuffer &framebuffer{m_debugFramebuffers.at(debugFramebuffer)};
+    auto &[visible, framebuffer] = m_debugFramebuffers.at(debugFramebuffer);
+    if (!visible) return;
 
     framebuffer.Bind();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
