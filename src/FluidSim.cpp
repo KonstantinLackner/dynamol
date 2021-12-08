@@ -570,6 +570,9 @@ void FluidSim::DoDroplets()
 
         const glm::vec3 randomPositions[2]{ RandomPosition(), RandomPosition() };
         m_impulse.emplace(Impulse{randomPositions[1], randomPositions[1] - randomPositions[0]});
+
+        glm::vec3 force = randomPositions[1] - randomPositions[0];
+        std::cout << "x: " << force.x << " y: " << force.y << " z: " << force.z << std::endl;
     }
 }
 

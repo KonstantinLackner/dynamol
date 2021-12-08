@@ -712,8 +712,8 @@ void SphereRenderer::display()
 				break;
 
 			case IM_Force:
-				ImGui::SliderFloat3("Force", glm::value_ptr(m_currentInputForce), -1000.0f, 1000.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
-				ImGui::SliderInt("Number Of Frames", &m_remainingFrames, 1, 100, "%d", ImGuiSliderFlags_AlwaysClamp);
+				ImGui::SliderFloat3("Force", glm::value_ptr(m_currentInputForce), -300.0f, 300.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+				ImGui::SliderInt("Number Of Frames", &m_remainingFrames, 1, 1000, "%d", ImGuiSliderFlags_AlwaysClamp);
 
 				if (m_remainingFrames == 0)
 				{
