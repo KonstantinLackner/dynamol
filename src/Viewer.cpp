@@ -54,10 +54,10 @@ Viewer::Viewer(GLFWwindow *window, Scene *scene) : m_window(window), m_scene(sce
 	m_interactors.emplace_back(std::make_unique<CameraInteractor>(this));
 	m_renderers.emplace_back(std::make_unique<SphereRenderer>(this));
 
-	static constexpr auto CubeSize = 128;
 	std::int32_t width;
 	std::int32_t height;
 	glfwGetWindowSize(window, &width, &height);
+
 	const glm::vec3 &minBounds{scene->minimumBounds()};
 	const glm::vec3 &maxBounds{scene->maximumBounds()};
 	const std::array<std::int32_t, 3> cubeSize{maxBounds.x - minBounds.x, maxBounds.y - minBounds.y, maxBounds.z - minBounds.z};

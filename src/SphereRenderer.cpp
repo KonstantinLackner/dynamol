@@ -23,14 +23,21 @@ using namespace gl;
 using namespace glm;
 using namespace globjects;
 
-void SphereRenderer::Molecule::addAtom(const glm::vec3 &atom)
+void SphereRenderer::Molecule::addAtoms(const std::vector<glm::vec3> &atoms)
 {
-	const auto addToBuffer = [&atom, this](std::unique_ptr<Buffer> &buffer)
+	std::vector<glm::vec4> transformedAtoms;
+	transformedAtoms.reserve(atoms.size());
+	std::transform(std::begin(atoms), std::end(atoms), std::back_inserter(transformedAtoms), [](const glm::vec3 &atom)
+	{
+		return glm::vec4{atom, 0.0f};
+	});
+
+	const auto addToBuffer = [&transformedAtoms, this](std::unique_ptr<Buffer> &buffer)
 	{
 		auto newBuffer = Buffer::create();
-		newBuffer->setStorage((numberOfAtoms + 1) * sizeof(glm::vec4), nullptr, gl::GL_DYNAMIC_STORAGE_BIT);
+		newBuffer->setStorage((numberOfAtoms + transformedAtoms.size()) * sizeof(glm::vec4), nullptr, gl::GL_DYNAMIC_STORAGE_BIT);
 		buffer->copySubData(newBuffer.get(), numberOfAtoms * sizeof(glm::vec4));
-		newBuffer->setSubData(numberOfAtoms * sizeof(glm::vec4), sizeof(glm::vec4), glm::value_ptr(glm::vec4{atom, 0.0f}));
+		newBuffer->setSubData(transformedAtoms, numberOfAtoms * sizeof(glm::vec4));
 
 		std::swap(buffer, newBuffer);
 	};
@@ -198,8 +205,17 @@ SphereRenderer::SphereRenderer(Viewer* viewer) : Renderer(viewer)
 		},
 		{ "./res/model/globals.glsl" });
 
-	shaderProgram("transformfeedback")->setUniform("minBounds", viewer->scene()->minimumBounds());
-	shaderProgram("transformfeedback")->setUniform("maxBounds", viewer->scene()->maximumBounds());
+	createShaderProgram("current_input_position", {
+			{ GL_VERTEX_SHADER, "./fluidsim/shader/current_input_position.vert" },
+			{ GL_FRAGMENT_SHADER, "./fluidsim/shader/current_input_position.frag" },
+		},
+		{ "./res/model/globals.glsl"});
+
+	const glm::vec3 &minimumBounds{viewer->scene()->minimumBounds()};
+	const glm::vec3 &maximumBounds{viewer->scene()->maximumBounds()};
+
+	shaderProgram("transformfeedback")->setUniform("minBounds", minimumBounds);
+	shaderProgram("transformfeedback")->setUniform("maxBounds", maximumBounds);
 
 	m_framebufferSize = viewer->viewportSize();
 
@@ -381,6 +397,18 @@ SphereRenderer::SphereRenderer(Viewer* viewer) : Renderer(viewer)
 
 	m_transformFeedback.reset(new TransformFeedback());
 	m_transformFeedback->setVaryings(shaderProgram("transformfeedback"), {"outCoords"}, GL_INTERLEAVED_ATTRIBS);
+
+	m_currentInputPosition = (minimumBounds + maximumBounds) / 2.0f;
+
+	m_currentInputPositionIndicatorBuffer = Buffer::create();
+
+	m_currentInputPositionIndicatorBuffer->setStorage(sizeof(glm::vec3), glm::value_ptr(m_currentInputPosition), gl::GL_DYNAMIC_STORAGE_BIT);
+
+	auto vertexBindingInput = m_currentInputPositionVao->binding(0);
+	vertexBindingInput->setAttribute(0);
+	vertexBindingInput->setBuffer(m_currentInputPositionIndicatorBuffer.get(), 0, sizeof(glm::vec3));
+	vertexBindingInput->setFormat(3, GL_FLOAT);
+	m_currentInputPositionVao->enable(0);
 }
 
 void SphereRenderer::display()
@@ -423,6 +451,7 @@ void SphereRenderer::display()
 	auto programDisplay = shaderProgram("display");
 	auto programShadow = shaderProgram("shadow");
 	auto programTransformFeedback = shaderProgram("transformfeedback");
+	auto programCurrentInputPosition = shaderProgram("current_input_position");
 
 	// get cursor position for magic lens
 	double mouseX, mouseY;
@@ -445,8 +474,11 @@ void SphereRenderer::display()
 	const mat3 normalMatrix = mat3(transpose(inverseModelViewMatrix));
 	const mat3 inverseNormalMatrix = inverse(normalMatrix);
 
-	const vec3 objectCenter = 0.5f * (viewer()->scene()->maximumBounds() + viewer()->scene()->minimumBounds());
-	const float objectRadius = 0.5f * length(viewer()->scene()->maximumBounds() - viewer()->scene()->minimumBounds());
+	const glm::vec3 &minimumBounds{viewer()->scene()->minimumBounds()};
+	const glm::vec3 &maximumBounds{viewer()->scene()->maximumBounds()};
+
+	const vec3 objectCenter = 0.5f * (maximumBounds + minimumBounds);
+	const float objectRadius = 0.5f * length(maximumBounds - minimumBounds);
 
 	const vec4 projectionInfo(float(-2.0 / (viewportSize.x * projectionMatrix[0][0])),
 		float(-2.0 / (viewportSize.y * projectionMatrix[1][1])),
@@ -633,6 +665,85 @@ void SphereRenderer::display()
 			ImGui::Checkbox("Prodecural Animation", &animate);
 			ImGui::SliderFloat("Frequency", &animationFrequency, 1.0f, 256.0f);
 			ImGui::SliderFloat("Amplitude", &animationAmplitude, 1.0f, 32.0f);
+		}
+
+		if (ImGui::CollapsingHeader("Input"))
+		{
+			const bool disabled{running};
+			if (disabled)
+			{
+				ImGui::BeginDisabled();
+			}
+
+			bool changed{false};
+			const auto slider = [&changed, &minimumBounds, &maximumBounds, this](const char *const name, float glm::vec3::*axis)
+			{
+				changed |= ImGui::SliderFloat(name, &(m_currentInputPosition.*axis), minimumBounds.*axis, maximumBounds.*axis, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+			};
+
+			slider("X", &glm::vec3::x);
+			slider("Y", &glm::vec3::y);
+			slider("Z", &glm::vec3::z);
+
+			if (changed)
+			{
+				updateCurrentInputPositionBuffer();
+			}
+
+			ImGui::RadioButton("Atoms", &m_inputMode, IM_Atom);
+			ImGui::RadioButton("Force", &m_inputMode, IM_Force);
+
+			switch (m_inputMode)
+			{
+			case IM_Atom:
+				ImGui::SliderInt("Amount", &m_numberOfAtomsToAdd, 1, 100, "%d", ImGuiSliderFlags_AlwaysClamp);
+
+				if (ImGui::Button("Add Atom"))
+				{
+					std::vector<glm::vec3> atoms;
+					atoms.resize(static_cast<std::size_t>(m_numberOfAtomsToAdd), m_currentInputPosition);
+
+					for (auto &molecule : m_molecules)
+					{
+						molecule.addAtoms(atoms);
+					}
+				}
+
+				break;
+
+			case IM_Force:
+				ImGui::SliderFloat3("Force", glm::value_ptr(m_currentInputForce), -1000.0f, 1000.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+				ImGui::SliderInt("Number Of Frames", &m_remainingFrames, 1, 100, "%d", ImGuiSliderFlags_AlwaysClamp);
+
+				if (m_remainingFrames == 0)
+				{
+					ImGui::BeginDisabled();
+				}
+
+				if (ImGui::Button("Add Force"))
+				{
+					running = true;
+					m_holdForFrames = m_remainingFrames;
+				}
+
+				if (m_remainingFrames == 0)
+				{
+					ImGui::EndDisabled();
+				}
+
+				break;
+			}
+
+			if (running)
+			{
+				viewer()->fluidSim()->AddImpulse({m_currentInputPosition - minimumBounds, m_currentInputForce * (static_cast<float>(m_remainingFrames) / m_holdForFrames)});
+				running = --m_remainingFrames > 0;
+
+				if (disabled)
+				{
+					ImGui::EndDisabled();
+				}
+			}
 		}
 
 		ImGui::EndMenu();
@@ -1182,6 +1293,22 @@ void SphereRenderer::display()
 
 	}
 
+	// Render current input position indicator
+
+	glPointSize(17.0f);
+
+	m_currentInputPositionVao->bind();
+	programCurrentInputPosition->use();
+	programCurrentInputPosition->setUniform("modelViewProjectionMatrix", modelViewProjectionMatrix);
+	m_currentInputPositionVao->drawArrays(GL_POINTS, 0, 1);
+	programCurrentInputPosition->release();
+	m_currentInputPositionVao->unbind();
+
 	// Restore OpenGL state
 	currentState->apply();
+}
+
+void SphereRenderer::updateCurrentInputPositionBuffer()
+{
+	m_currentInputPositionIndicatorBuffer->setSubData(0, sizeof(glm::vec3), glm::value_ptr(m_currentInputPosition));
 }

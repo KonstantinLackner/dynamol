@@ -1,13 +1,13 @@
 #pragma once
 
 #include "Renderer.h"
-#include "ImpulseState.h"
 #include "Interactor.h"
 #include "Shader.h"
 
 #include <array>
 #include <map>
 #include <memory>
+#include <optional>
 #include <tuple>
 #include <variant>
 
@@ -50,7 +50,7 @@ namespace dynamol
         {
             float Gravity{ 0.0f }; // { 8.0f };
             float GlobalGravity{ 0.0f };
-            bool DoDroplets{ true };
+            bool DoDroplets{ false };
             float ForceMultiplier{ 1.0f };
             float SplatRadius{ 20.0f };
 
@@ -64,15 +64,15 @@ namespace dynamol
         struct InkVariables : public Variables
         {
             bool DoInk { false };
-            bool RainbowMode{ false };
             glm::vec4 InkColor{ 1.0f, 1.0f, 1.0f, 1.0f };
             float InkVolume { 20.0f };
             std::int32_t DebugFramebufferDepth { 0 };
         };
 
-        struct DebugVariables
+        struct Impulse
         {
-            
+            glm::vec3 Position;
+            glm::vec3 Force;
         };
 
     public:
@@ -84,6 +84,7 @@ namespace dynamol
         void DoInk();
         const CStdTexture3D &GetVelocityTexture() const;
         void DisplayDebugTextures();
+        void AddImpulse(const Impulse &impulse);
 
         virtual void keyEvent(int key, int scancode, int action, int mods) override;
         virtual void display() override;
@@ -107,7 +108,6 @@ namespace dynamol
         VelocityVariables m_variables;
         InkVariables m_inkVariables;
         Renderer *m_renderer;
-        std::array<std::int32_t, 2> m_windowDimensions;
         std::array<std::int32_t, 3> m_cubeDimensions;
         std::unique_ptr<globjects::Query> m_timerQuery;
 
@@ -139,7 +139,7 @@ namespace dynamol
         float m_dt;
         float m_gridScale;
         float m_lastTime;
-        ImpulseState m_impulseState;
+        std::optional<Impulse> m_impulse;
         GLuint m_frameCounter;
         GLuint m_frameTimeSum;
         bool m_captureState;

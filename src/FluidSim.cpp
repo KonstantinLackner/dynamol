@@ -26,14 +26,13 @@ FluidSim::FluidSim(Renderer *const renderer, const std::array<std::int32_t, 2> &
     : Interactor{renderer->viewer()},
       m_renderer{renderer},
       m_timerQuery{std::make_unique<globjects::Query>()},
-	  m_windowDimensions{windowDimensions},
 	  m_cubeDimensions{cubeDimensions},
       m_velocityTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true},
       m_pressureTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true },
       m_divergenceTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true },
 	  m_temporaryTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true },
       m_inkTexture{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2], 4, false, true },
-      m_gridScale{1.0f/128.f},
+      m_gridScale{1.0f/2048.f},
       m_dt{0},
       m_lastTime{0},
       m_frameCounter{0},
@@ -46,19 +45,14 @@ FluidSim::FluidSim(Renderer *const renderer, const std::array<std::int32_t, 2> &
         m_debugFramebuffers[name] = {false, CStdFramebuffer{windowDimensions[0], windowDimensions[1]}};
     }
 
+    //glViewport(0, 0, m_cubeDimensions[0], m_cubeDimensions[1]);
+
     m_velocityTexture.SetObjectLabel("velocity");
     m_pressureTexture.SetObjectLabel("pressure");
     m_divergenceTexture.SetObjectLabel("divergence");
     m_temporaryTexture.SetObjectLabel("temporary");
     m_inkTexture.SetObjectLabel("ink");
     LoadShaders();
-
-    for (const auto &it : m_debugFramebuffers)
-    {
-        it.second.second.Bind();
-        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-        it.second.second.Unbind();
-    }
 }
 
 FluidSim::~FluidSim()
@@ -140,18 +134,16 @@ void FluidSim::Execute()
     CallDebugMethods(m_velocityTexture.GetFront(), 50, "Impulse");
 
 #pragma region Impulse
-    if (m_impulseState.ForceActive)
+    if (m_impulse)
     {
-        m_addImpulseProgram->setUniform("position", m_impulseState.CurrentPos);
+        m_addImpulseProgram->setUniform("position", m_impulse->Position);
         m_addImpulseProgram->setUniform("radius", m_variables.SplatRadius);
         m_addImpulseProgram->setUniform("forceMultiplier", m_variables.ForceMultiplier);
-        m_addImpulseProgram->setUniform("force", glm::vec4{ m_impulseState.Delta, 0 });
+        m_addImpulseProgram->setUniform("force", glm::vec4{ m_impulse->Force, 0 });
         BindImage(m_addImpulseProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
         BindImage(m_addImpulseProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
         Compute(m_addImpulseProgram);
         m_velocityTexture.SwapBuffers();
-
-        m_impulseState.ForceActive = false;
     }
 #pragma endregion
 
@@ -250,6 +242,8 @@ void FluidSim::Execute()
     {
         DoInk();
     }
+
+    m_impulse.reset();
 }
 
 void FluidSim::DoInk()
@@ -268,19 +262,16 @@ void FluidSim::DoInk()
     const float beta{ 1.0f / (6.0f + alpha) };
     SolvePoissonSystem(m_inkTexture, m_inkTexture.GetFront(), alpha, beta, false);
 
-    if (m_impulseState.InkActive)
+    if (m_impulse)
     {
-        const glm::vec4 color{m_inkVariables.RainbowMode ? m_impulseState.TickRainbowMode(m_dt) : m_inkVariables.InkColor };
-        m_addImpulseProgram->setUniform("position", m_impulseState.CurrentPos);
+        m_addImpulseProgram->setUniform("position", m_impulse->Position);
         m_addImpulseProgram->setUniform("radius", m_inkVariables.InkVolume);
         m_addImpulseProgram->setUniform("forceMultiplier", 1.0f);
-        m_addImpulseProgram->setUniform("force", color);
+        m_addImpulseProgram->setUniform("force", m_inkVariables.InkColor);
         BindImage(m_addImpulseProgram, "field_r", m_inkTexture.GetFront(), 0, GL_READ_ONLY);
         BindImage(m_addImpulseProgram, "field_w", m_inkTexture.GetBack(), 1, GL_WRITE_ONLY);
         Compute(m_addImpulseProgram);
         m_inkTexture.SwapBuffers();
-
-        m_impulseState.InkActive = false;
     }
 
     if (m_inkVariables.Boundaries)
@@ -378,6 +369,11 @@ void FluidSim::DisplayDebugTextures()
     }
 }
 
+void FluidSim::AddImpulse(const Impulse &impulse)
+{
+    m_impulse.emplace(impulse);
+}
+
 void FluidSim::keyEvent(const int key, const int scancode, const int action, const int mods)
 {
     if (key == GLFW_KEY_F10 && action == GLFW_RELEASE)
@@ -436,10 +432,7 @@ void FluidSim::display()
 
             defaultVariables(m_inkVariables);
             ImGui::SliderInt("Depth", &m_inkVariables.DebugFramebufferDepth, 0, m_cubeDimensions[2] - 1, "%d", ImGuiSliderFlags_AlwaysClamp);
-            ImGui::Separator();
-            ImGui::Checkbox("RainbowMode", &m_inkVariables.RainbowMode);
             ImGui::SliderFloat("InkVolume", &m_inkVariables.InkVolume, 1.0f, (m_cubeDimensions[0] / 5.0f) * 4.0f, "%.5f", sliderFlags);
-            ImGui::Separator();
             ImGui::ColorEdit4("InkColor", glm::value_ptr(m_inkVariables.InkColor));
             ImGui::Separator();
 
@@ -576,12 +569,7 @@ void FluidSim::DoDroplets()
         //LOG_INFO("Next drop: %.2f", next_drop);
 
         const glm::vec3 randomPositions[2]{ RandomPosition(), RandomPosition() };
-        m_impulseState.LastPos = randomPositions[0];
-        m_impulseState.CurrentPos = randomPositions[1];
-        m_impulseState.Delta = m_impulseState.CurrentPos - m_impulseState.LastPos;
-        m_impulseState.ForceActive = true;
-        m_impulseState.InkActive = true;
-        m_impulseState.Radial = true;
+        m_impulse.emplace(Impulse{randomPositions[1], randomPositions[1] - randomPositions[0]});
     }
 }
 

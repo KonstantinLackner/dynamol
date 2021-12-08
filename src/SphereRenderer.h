@@ -35,13 +35,16 @@ namespace dynamol
 
 			Molecule(const std::vector<glm::vec4> &atoms);
 
-			void addAtom(const glm::vec3 &atom);
+			void addAtoms(const std::vector<glm::vec3> &atoms);
 		};
 
 	public:
 		SphereRenderer(Viewer *viewer);
 
 		virtual void display();
+
+	private:
+		void updateCurrentInputPositionBuffer();
 
 	private:
 		std::vector<Molecule> m_molecules;
@@ -91,6 +94,23 @@ namespace dynamol
 		glm::ivec2 m_shadowMapSize = glm::ivec2(512, 512);
 		glm::ivec2 m_framebufferSize;
 		float m_resolutionScale{1.0f};
+
+		glm::vec3 m_currentInputPosition;
+		std::unique_ptr<globjects::VertexArray> m_currentInputPositionVao = std::make_unique<globjects::VertexArray>();
+		std::unique_ptr<globjects::Buffer> m_currentInputPositionIndicatorBuffer;
+		std::int32_t m_numberOfAtomsToAdd{1};
+		glm::vec3 m_currentInputForce{1.0f, 1.0f, 1.0f};
+
+		enum InputMode : std::int32_t
+		{
+			IM_Atom,
+			IM_Force,
+		};
+
+		std::int32_t m_inputMode{IM_Atom};
+		std::int32_t m_holdForFrames{1};
+		std::int32_t m_remainingFrames{1};
+		bool running{false};
 	};
 
 }

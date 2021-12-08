@@ -19,22 +19,43 @@ void main()
 
 	vec4 value = imageLoad(field_r, coord);
 
-	if (coord.x == 0 || coord.x == img_size.x - 1)
+	if (coord.x == 0)
 	{
-		//value.x *= scale;
-		value.x = 0;
+		if (value.x < 0) {
+			value.x = 0;
+		}
 	}
 
-	if (coord.y == 0 || coord.y == img_size.y - 1)
-	{
-		//value.y *= scale;
-		value.y = 0;
+	if (coord.x == img_size.x -1) {
+		if (value.x > 0) {
+			value.x = 0;
+		}
 	}
 
-	if (coord.z == 0 || coord.z == img_size.z - 1)
+	if (coord.y == 0)
 	{
-		//value.z *= scale;
-		value.z = 0;
+		if (value.y < 0) {
+			value.y = 0;
+		}
+	}
+
+	if (coord.y == img_size.y -1) {
+		if (value.y > 0) {
+			value.y = 0;
+		}
+	}
+
+	if (coord.z == 0)
+	{
+		if (value.z < 0) {
+			value.z = 0;
+		}
+	}
+
+	if (coord.z == img_size.z -1) {
+		if (value.z > 0) {
+			value.z = 0;
+		}
 	}
 
 	imageStore(field_w, coord, value);

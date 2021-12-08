@@ -3,7 +3,7 @@ file(GLOB imgui_sources ${CMAKE_SOURCE_DIR}/lib/imgui/*.cpp ${CMAKE_SOURCE_DIR}/
 file(GLOB tinyfd_sources ${CMAKE_SOURCE_DIR}/lib/tinyfd/tinyfiledialogs.c ${CMAKE_SOURCE_DIR}/lib/tinyfd/tinyfiledialogs.h)
 file(GLOB stb_sources ${CMAKE_SOURCE_DIR}/lib/stb/*.c ${CMAKE_SOURCE_DIR}/lib/stb/*.h)
 
-set(fluidsim_extra_sources ImpulseState.cpp ImpulseState.h Shader.cpp Shader.h)
+set(fluidsim_extra_sources Shader.cpp Shader.h)
 list(TRANSFORM fluidsim_extra_sources PREPEND ${CMAKE_SOURCE_DIR}/fluidsim/)
 
 include_directories(${CMAKE_SOURCE_DIR}/fluidsim)
