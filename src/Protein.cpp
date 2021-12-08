@@ -231,11 +231,6 @@ const std::vector< std::vector<glm::vec4> > & Protein::atoms() const
 	return m_atoms;
 }
 
-void Protein::addAtom(const glm::vec4 &atom)
-{
-	std::for_each(std::begin(m_atoms), std::end(m_atoms), [&atom](auto &atoms) { atoms.emplace_back(atom); });
-}
-
 vec3 Protein::minimumBounds() const
 {
 	return m_minimumBounds;

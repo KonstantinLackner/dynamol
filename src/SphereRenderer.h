@@ -1,5 +1,4 @@
 #pragma once
-#include "Interactor.h"
 #include "Renderer.h"
 #include <memory>
 
@@ -26,7 +25,7 @@ namespace dynamol
 {
 	class Viewer;
 
-	class SphereRenderer : public Renderer, public Interactor
+	class SphereRenderer : public Renderer
 	{
 	private:
 		struct Molecule
@@ -42,11 +41,7 @@ namespace dynamol
 	public:
 		SphereRenderer(Viewer *viewer);
 
-		using Renderer::viewer;
-		using Renderer::display;
 		virtual void display();
-
-		virtual void mouseButtonEvent(int button, int action, int mods);
 
 	private:
 		std::vector<Molecule> m_molecules;

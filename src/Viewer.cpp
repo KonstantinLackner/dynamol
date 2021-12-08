@@ -309,14 +309,6 @@ void Viewer::mouseButtonCallback(GLFWwindow* window, int button, int action, int
 		{
 			i->mouseButtonEvent(button, action, mods);
 		}
-
-		for (auto &i : viewer->m_renderers)
-		{
-			if (auto *const interactor{dynamic_cast<Interactor *>(i.get())}; interactor)
-			{
-				interactor->mouseButtonEvent(button, action, mods);
-			}
-		}
 	}
 }
 

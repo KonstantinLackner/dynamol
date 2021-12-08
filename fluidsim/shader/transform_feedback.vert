@@ -5,7 +5,7 @@ layout(binding = 0) uniform sampler3D sampler;
 uniform vec3 minBounds;
 uniform vec3 maxBounds;
 
-uniform float forceMultiplier = 0.1;
+uniform float forceMultiplier = 0.01;
 
 out vec4 outCoords;
 

@@ -77,12 +77,9 @@ namespace dynamol
         void Execute();
         void DoInk();
         const CStdTexture3D &GetVelocityTexture() const;
-        bool WantsMouseInput() const { return m_wantsMouseInput; }
         void DisplayDebugTextures();
 
         virtual void keyEvent(int key, int scancode, int action, int mods) override;
-		virtual void mouseButtonEvent(int button, int action, int mods) override;
-        virtual void cursorPosEvent(double x, double y) override;
         virtual void display() override;
 
     private:
@@ -136,9 +133,7 @@ namespace dynamol
         float m_dt;
         float m_gridScale;
         float m_lastTime;
-        std::variant<std::monostate, ImpulseState, std::pair<glm::vec3, glm::vec3>> m_impulseState;
-        bool m_mouseButtonPressed;
-        bool m_wantsMouseInput;
+        ImpulseState m_impulseState;
         GLuint m_frameCounter;
         GLuint m_frameTimeSum;
         bool m_captureState;

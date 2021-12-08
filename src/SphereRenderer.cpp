@@ -97,7 +97,7 @@ std::unique_ptr<Texture> loadTexture(const std::string& filename)
 	return std::unique_ptr<Texture>();
 }
 
-SphereRenderer::SphereRenderer(Viewer* viewer) : Renderer(viewer), Interactor{viewer}
+SphereRenderer::SphereRenderer(Viewer* viewer) : Renderer(viewer)
 {
 	Shader::hintIncludeImplementation(Shader::IncludeImplementation::Fallback);
 
@@ -1184,49 +1184,4 @@ void SphereRenderer::display()
 
 	// Restore OpenGL state
 	currentState->apply();
-}
-
-void SphereRenderer::mouseButtonEvent(const int button, const int action, const int mods)
-{
-	if (button != GLFW_MOUSE_BUTTON_RIGHT || action != GLFW_PRESS) return;
-
-	double x;
-	double y;
-	glfwGetCursorPos(viewer()->window(), &x, &y);
-
-	const auto viewportSize = glm::floor(static_cast<glm::vec2>(viewer()->viewportSize()) * m_resolutionScale);
-
-    y = viewportSize.y - y;
-
-	const auto halfWindowWidth = viewportSize.x / 2;
-	const auto halfWindowHeight = viewportSize.y / 2;
-
-	const glm::vec4 screenCoords{
-		static_cast<float>((x - halfWindowWidth) / halfWindowWidth),
-		static_cast<float>((y - halfWindowHeight) / halfWindowWidth),
-		-2,
-		1
-		};
-
-	glm::vec4 pickCoords{glm::inverse(viewer()->modelViewProjectionTransform()) * screenCoords};
-	pickCoords /= pickCoords.w;
-	const glm::vec3 &minimumBounds{viewer()->scene()->minimumBounds()};
-	const glm::vec3 &maximumBounds{viewer()->scene()->maximumBounds()};
-	const glm::vec3 coords{pickCoords.x, pickCoords.y, (minimumBounds.z + maximumBounds.z) / 2};
-
-
-	// Out of bounds?
-	if (coords.x < minimumBounds.x || coords.x > maximumBounds.x
-		|| coords.y < minimumBounds.y || coords.y > maximumBounds.y)
-		/*|| coords.z < minimumBounds.z || coords.z > maximumBounds.z*/
-	{
-		return;
-	}
-
-	// TODO: camera matrix handling
-
-	for (auto &molecule : m_molecules)
-	{
-		molecule.addAtom(coords);
-	}
 }

@@ -116,15 +116,6 @@ build src\CMakeFiles\dynamol.dir\Protein.cpp.obj: CXX_COMPILER__dynamol_Debug ..
   TARGET_COMPILE_PDB = src\CMakeFiles\dynamol.dir\
   TARGET_PDB = ..\..\..\bin\dynamol.pdb
 
-build src\CMakeFiles\dynamol.dir\Raycast.cpp.obj: CXX_COMPILER__dynamol_Debug ..\..\..\src\Raycast.cpp || cmake_object_order_depends_target_dynamol
-  DEFINES = -DGLFW_DLL -DGLM_FORCE_RADIANS -DGLOBJECTS_CHECK_GL_ERRORS -DSYSTEM_WINDOWS -D_CRT_SECURE_NO_WARNINGS -D_SCL_SECURE_NO_WARNINGS
-  FLAGS = /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17
-  INCLUDES = -I..\..\..\fluidsim -I..\..\..\lib\imgui -I..\..\..\lib\tinyfd -I..\..\..\lib\stb -I..\..\..\lib\glm -I..\..\..\lib\glfw\include -I..\..\..\lib\glbinding\include -I..\..\..\lib\globjects\include
-  OBJECT_DIR = src\CMakeFiles\dynamol.dir
-  OBJECT_FILE_DIR = src\CMakeFiles\dynamol.dir
-  TARGET_COMPILE_PDB = src\CMakeFiles\dynamol.dir\
-  TARGET_PDB = ..\..\..\bin\dynamol.pdb
-
 build src\CMakeFiles\dynamol.dir\Renderer.cpp.obj: CXX_COMPILER__dynamol_Debug ..\..\..\src\Renderer.cpp || cmake_object_order_depends_target_dynamol
   DEFINES = -DGLFW_DLL -DGLM_FORCE_RADIANS -DGLOBJECTS_CHECK_GL_ERRORS -DSYSTEM_WINDOWS -D_CRT_SECURE_NO_WARNINGS -D_SCL_SECURE_NO_WARNINGS
   FLAGS = /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17
@@ -259,7 +250,7 @@ build src\CMakeFiles\dynamol.dir\__\fluidsim\Shader.cpp.obj: CXX_COMPILER__dynam
 #############################################
 # Link the executable ..\..\..\bin\dynamol.exe
 
-build ..\..\..\bin\dynamol.exe: CXX_EXECUTABLE_LINKER__dynamol_Debug src\CMakeFiles\dynamol.dir\BoundingBoxRenderer.cpp.obj src\CMakeFiles\dynamol.dir\CameraInteractor.cpp.obj src\CMakeFiles\dynamol.dir\FluidSim.cpp.obj src\CMakeFiles\dynamol.dir\Interactor.cpp.obj src\CMakeFiles\dynamol.dir\Protein.cpp.obj src\CMakeFiles\dynamol.dir\Raycast.cpp.obj src\CMakeFiles\dynamol.dir\Renderer.cpp.obj src\CMakeFiles\dynamol.dir\Scene.cpp.obj src\CMakeFiles\dynamol.dir\SphereRenderer.cpp.obj src\CMakeFiles\dynamol.dir\Viewer.cpp.obj src\CMakeFiles\dynamol.dir\main.cpp.obj src\CMakeFiles\dynamol.dir\__\lib\imgui\imgui.cpp.obj src\CMakeFiles\dynamol.dir\__\lib\imgui\imgui_demo.cpp.obj src\CMakeFiles\dynamol.dir\__\lib\imgui\imgui_draw.cpp.obj src\CMakeFiles\dynamol.dir\__\lib\imgui\imgui_tables.cpp.obj src\CMakeFiles\dynamol.dir\__\lib\imgui\imgui_widgets.cpp.obj src\CMakeFiles\dynamol.dir\__\lib\tinyfd\tinyfiledialogs.c.obj src\CMakeFiles\dynamol.dir\__\lib\stb\stb_vorbis.c.obj src\CMakeFiles\dynamol.dir\__\fluidsim\ImpulseState.cpp.obj src\CMakeFiles\dynamol.dir\__\fluidsim\Shader.cpp.obj | ..\..\..\lib\glfw\lib\glfw3ddll.lib ..\..\..\lib\globjects\lib\globjectsd.lib ..\..\..\lib\glbinding\lib\glbinding-auxd.lib ..\..\..\lib\glbinding\lib\glbindingd.lib
+build ..\..\..\bin\dynamol.exe: CXX_EXECUTABLE_LINKER__dynamol_Debug src\CMakeFiles\dynamol.dir\BoundingBoxRenderer.cpp.obj src\CMakeFiles\dynamol.dir\CameraInteractor.cpp.obj src\CMakeFiles\dynamol.dir\FluidSim.cpp.obj src\CMakeFiles\dynamol.dir\Interactor.cpp.obj src\CMakeFiles\dynamol.dir\Protein.cpp.obj src\CMakeFiles\dynamol.dir\Renderer.cpp.obj src\CMakeFiles\dynamol.dir\Scene.cpp.obj src\CMakeFiles\dynamol.dir\SphereRenderer.cpp.obj src\CMakeFiles\dynamol.dir\Viewer.cpp.obj src\CMakeFiles\dynamol.dir\main.cpp.obj src\CMakeFiles\dynamol.dir\__\lib\imgui\imgui.cpp.obj src\CMakeFiles\dynamol.dir\__\lib\imgui\imgui_demo.cpp.obj src\CMakeFiles\dynamol.dir\__\lib\imgui\imgui_draw.cpp.obj src\CMakeFiles\dynamol.dir\__\lib\imgui\imgui_tables.cpp.obj src\CMakeFiles\dynamol.dir\__\lib\imgui\imgui_widgets.cpp.obj src\CMakeFiles\dynamol.dir\__\lib\tinyfd\tinyfiledialogs.c.obj src\CMakeFiles\dynamol.dir\__\lib\stb\stb_vorbis.c.obj src\CMakeFiles\dynamol.dir\__\fluidsim\ImpulseState.cpp.obj src\CMakeFiles\dynamol.dir\__\fluidsim\Shader.cpp.obj | ..\..\..\lib\glfw\lib\glfw3ddll.lib ..\..\..\lib\globjects\lib\globjectsd.lib ..\..\..\lib\glbinding\lib\glbinding-auxd.lib ..\..\..\lib\glbinding\lib\glbindingd.lib
   FLAGS = /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1
   LINK_FLAGS = /machine:x64 /debug /INCREMENTAL /subsystem:console
   LINK_LIBRARIES = ..\..\..\lib\glfw\lib\glfw3ddll.lib  ..\..\..\lib\globjects\lib\globjectsd.lib  ..\..\..\lib\glbinding\lib\glbinding-auxd.lib  ..\..\..\lib\glbinding\lib\glbindingd.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib

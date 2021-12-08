@@ -1,5 +1,4 @@
 #include "FluidSim.h"
-#include "Raycast.h"
 #include "Viewer.h"
 
 using namespace gl;
@@ -38,8 +37,6 @@ FluidSim::FluidSim(Renderer *const renderer, const std::array<std::int32_t, 2> &
       m_gridScale{1.0f/128.f},
       m_dt{0},
       m_lastTime{0},
-      m_mouseButtonPressed{false},
-      m_wantsMouseInput{false},
       m_frameCounter{0},
       m_frameTimeSum{0},
       m_captureState{false},
@@ -147,66 +144,19 @@ void FluidSim::Execute()
     CallDebugMethods(m_velocityTexture.GetFront(), 50, "Impulse");
 
 #pragma region Impulse
-
-    if (m_mouseButtonPressed)
+    if (m_impulseState.ForceActive)
     {
-        Viewer *const viewer{m_renderer->viewer()};
-        double x;
-        double y;
-        glfwGetCursorPos(viewer->window(), &x, &y);
-        y = m_windowDimensions[1] - y;
+        m_addImpulseProgram->setUniform("position", m_impulseState.CurrentPos);
+        m_addImpulseProgram->setUniform("radius", m_variables.SplatRadius);
+        m_addImpulseProgram->setUniform("forceMultiplier", m_variables.ForceMultiplier);
+        m_addImpulseProgram->setUniform("force", glm::vec4{ m_impulseState.Delta, 0 });
+        BindImage(m_addImpulseProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
+        BindImage(m_addImpulseProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
+        Compute(m_addImpulseProgram);
+        m_velocityTexture.SwapBuffers();
 
-        const auto halfWindowWidth = static_cast<double>(m_windowDimensions[0]) / 2;
-        const auto halfWindowHeight = static_cast<double>(m_windowDimensions[1]) / 2;
-
-        const glm::vec4 screenCoords{
-            static_cast<float>((x - halfWindowWidth) / halfWindowWidth),
-            static_cast<float>((y - halfWindowHeight) / halfWindowWidth),
-            -2,
-            1
-            };
-
-        glm::vec4 pickCoords{glm::inverse(viewer->viewProjectionTransform()) * screenCoords};
-        pickCoords /= pickCoords.w;
-
-        const glm::vec3 cameraPosition{viewer->cameraPosition()};
-        const auto delta = glm::vec3{pickCoords.x, pickCoords.y, pickCoords.z} - cameraPosition;
-        const auto direction = glm::normalize(delta);
-
-        if (const auto intersections = Raycast::GetLineIntersectionsWithBox(cameraPosition, direction); intersections)
-        {
-            const glm::vec3 cubeSize{m_cubeDimensions[0], m_cubeDimensions[1], m_cubeDimensions[2]};
-            m_impulseState.emplace<2>(std::make_pair((intersections->first + 0.5f) * cubeSize, (intersections->second + 0.5f) * cubeSize));
-        }
+        m_impulseState.ForceActive = false;
     }
-
-    std::visit(Visitor{
-        [this](const ImpulseState &impulseState)
-        {
-            m_addImpulseProgram->setUniform("position", impulseState.CurrentPos);
-            m_addImpulseProgram->setUniform("radius", m_variables.SplatRadius);
-            m_addImpulseProgram->setUniform("forceMultiplier", m_variables.ForceMultiplier);
-            m_addImpulseProgram->setUniform("force", glm::vec4{ impulseState.Delta, 0 });
-            BindImage(m_addImpulseProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
-            BindImage(m_addImpulseProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
-            Compute(m_addImpulseProgram);
-            m_velocityTexture.SwapBuffers();
-        },
-        [this](const std::pair<glm::vec3, glm::vec3> &impulseLine)
-        {
-            m_addImpulseLineProgram->setUniform("radius", m_variables.SplatRadius);
-            m_addImpulseLineProgram->setUniform("start", impulseLine.first);
-            m_addImpulseLineProgram->setUniform("end", impulseLine.second);
-            m_addImpulseLineProgram->setUniform("cameraPosition", m_renderer->viewer()->cameraPosition());
-            m_addImpulseLineProgram->setUniform("forceMultiplier", m_variables.ForceMultiplier);
-            BindImage(m_addImpulseLineProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
-            BindImage(m_addImpulseLineProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
-            Compute(m_addImpulseLineProgram);
-            m_velocityTexture.SwapBuffers();
-        },
-        [this](std::monostate) {}
-    }, m_impulseState);
-
 #pragma endregion
 
     /*
@@ -305,8 +255,6 @@ void FluidSim::Execute()
     {
         DoInk();
     }
-
-    m_impulseState.emplace<std::monostate>();
 }
 
 void FluidSim::DoInk()
@@ -325,33 +273,20 @@ void FluidSim::DoInk()
     const float beta{ 1.0f / (6.0f + alpha) };
     SolvePoissonSystem(m_inkTexture, m_inkTexture.GetFront(), alpha, beta, false);
 
-    std::visit(Visitor{
-        [this](ImpulseState &impulseState)
-        {
-            glm::vec4 color{m_inkVariables.RainbowMode ? impulseState.TickRainbowMode(m_dt) : m_inkVariables.InkColor };
-            m_addImpulseProgram->setUniform("position", impulseState.CurrentPos);
-            m_addImpulseProgram->setUniform("radius", m_inkVariables.InkVolume);
-            m_addImpulseProgram->setUniform("forceMultiplier", 1.0f);
-            m_addImpulseProgram->setUniform("force", color);
-            BindImage(m_addImpulseProgram, "field_r", m_inkTexture.GetFront(), 0, GL_READ_ONLY);
-            BindImage(m_addImpulseProgram, "field_w", m_inkTexture.GetBack(), 1, GL_WRITE_ONLY);
-            Compute(m_addImpulseProgram);
-            m_inkTexture.SwapBuffers();
-        },
-        [this](const std::pair<glm::vec3, glm::vec3> &impulseLine)
-        {
-            /*m_addImpulseLineProgram->setUniform("radius", m_inkVariables.InkVolume);
-            m_addImpulseLineProgram->setUniform("start", impulseLine.first);
-            m_addImpulseLineProgram->setUniform("end", impulseLine.second);
-            m_addImpulseLineProgram->setUniform("cameraPosition", m_renderer->viewer()->cameraPosition());
-            m_addImpulseLineProgram->setUniform("forceMultiplier", 1.0f);
-            BindImage(m_addImpulseLineProgram, "field_r", m_inkTexture.GetFront(), 0, GL_READ_ONLY);
-            BindImage(m_addImpulseLineProgram, "field_w", m_inkTexture.GetBack(), 1, GL_WRITE_ONLY);
-            Compute(m_addImpulseLineProgram);
-            m_inkTexture.SwapBuffers();*/
-        },
-        [this](std::monostate) {}
-    }, m_impulseState);
+    if (m_impulseState.InkActive)
+    {
+        const glm::vec4 color{m_inkVariables.RainbowMode ? m_impulseState.TickRainbowMode(m_dt) : m_inkVariables.InkColor };
+        m_addImpulseProgram->setUniform("position", m_impulseState.CurrentPos);
+        m_addImpulseProgram->setUniform("radius", m_inkVariables.InkVolume);
+        m_addImpulseProgram->setUniform("forceMultiplier", 1.0f);
+        m_addImpulseProgram->setUniform("force", color);
+        BindImage(m_addImpulseProgram, "field_r", m_inkTexture.GetFront(), 0, GL_READ_ONLY);
+        BindImage(m_addImpulseProgram, "field_w", m_inkTexture.GetBack(), 1, GL_WRITE_ONLY);
+        Compute(m_addImpulseProgram);
+        m_inkTexture.SwapBuffers();
+
+        m_impulseState.InkActive = false;
+    }
 
     if (m_inkVariables.Boundaries)
     {
@@ -457,17 +392,6 @@ void FluidSim::keyEvent(const int key, const int scancode, const int action, con
     }
 }
 
-void FluidSim::mouseButtonEvent(const int button, const int action, const int mods)
-{
-    if (button != GLFW_MOUSE_BUTTON_LEFT) return;
-    m_mouseButtonPressed = action == GLFW_PRESS;
-}
-
-void FluidSim::cursorPosEvent(const double x, const double y)
-{
-    //m_mouseButtonPressed = WantsMouseInput() && glfwGetMouseButton(m_renderer->viewer()->window(), GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
-}
-
 void FluidSim::display()
 {
     if (ImGui::BeginMenu("FluidSim"))
@@ -484,8 +408,8 @@ void FluidSim::display()
 
         const auto defaultVariables = [sliderFlags, this](Variables& variables)
         {
-            ImGui::SliderFloat("Dissipation", &variables.Dissipation, 0.9f, 1.0f, "%.5f", sliderFlags);
-            ImGui::SliderFloat("Viscosity", &variables.Viscosity, 0.001f, 0.15f, "%.5f", sliderFlags);
+            ImGui::SliderFloat("Dissipation", &variables.Dissipation, 0.9f, 0.93f, "%.5f", sliderFlags);
+            ImGui::SliderFloat("Viscosity", &variables.Viscosity, 0.05f, 0.15f, "%.5f", sliderFlags);
             ImGui::Checkbox("Boundaries", &variables.Boundaries);
             ImGui::Separator();
         };
@@ -493,8 +417,8 @@ void FluidSim::display()
         if (ImGui::BeginMenu("Velocity"))
         {
             defaultVariables(m_variables);
-            ImGui::SliderFloat("Gravity", &m_variables.Gravity, 0.0f, 30.0f, "%.3f", sliderFlags);
-            ImGui::SliderFloat("GlobalGravity", &m_variables.GlobalGravity, 0.0f, 30.0f, "%.3f", sliderFlags);
+            ImGui::SliderFloat("Gravity", &m_variables.Gravity, 0.0f, 10.0f, "%.3f", sliderFlags);
+            ImGui::SliderFloat("GlobalGravity", &m_variables.GlobalGravity, 0.0f, 10.0f, "%.3f", sliderFlags);
             ImGui::SliderInt("Depth", &m_variables.DebugFramebuffer.Depth, 0, m_cubeDimensions[2] - 1, "%d", ImGuiSliderFlags_AlwaysClamp);
             ImGui::DragFloatRange2("Range", &m_variables.DebugFramebuffer.Range.x, &m_variables.DebugFramebuffer.Range.y, 1.0f, -128.0f, 128.0f, "%.3f", nullptr, ImGuiSliderFlags_AlwaysClamp);
             ImGui::SliderFloat("SplatRadius", &m_variables.SplatRadius, 1.0f, (m_cubeDimensions[0] / 5.0f) * 4.0f, "%.5f", sliderFlags);
@@ -531,9 +455,6 @@ void FluidSim::display()
 
         ImGui::Separator();
 
-
-        //ImGui::Separator();
-        //ImGui::Checkbox("Mouse input", &m_wantsMouseInput);
 		ImGui::EndMenu();
 	}
 }
@@ -650,15 +571,12 @@ void FluidSim::DoDroplets()
         //LOG_INFO("Next drop: %.2f", next_drop);
 
         const glm::vec3 randomPositions[2]{ RandomPosition(), RandomPosition() };
-        ImpulseState impulseState;
-        impulseState.LastPos = randomPositions[0];
-        impulseState.CurrentPos = randomPositions[1];
-        impulseState.Delta = impulseState.CurrentPos - impulseState.LastPos;
-        //globjects::debug() << impulseState.Delta.x << ',' << impulseState.Delta.y << ',' << impulseState.Delta.z << ',' <<'\n';
-        impulseState.ForceActive = true;
-        impulseState.InkActive = true;
-        impulseState.Radial = true;
-        m_impulseState.emplace<ImpulseState>(impulseState);
+        m_impulseState.LastPos = randomPositions[0];
+        m_impulseState.CurrentPos = randomPositions[1];
+        m_impulseState.Delta = m_impulseState.CurrentPos - m_impulseState.LastPos;
+        m_impulseState.ForceActive = true;
+        m_impulseState.InkActive = true;
+        m_impulseState.Radial = true;
     }
 }
 
