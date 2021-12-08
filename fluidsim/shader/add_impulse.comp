@@ -105,6 +105,6 @@ void equal_impulse(ivec3 centreCoords)
 void main()
 {
     ivec3 coord = ivec3(gl_GlobalInvocationID);
-    //impulse_point(coord);
-    equal_impulse(coord);
+    impulse_point(coord);
+    //equal_impulse(coord);
 }
