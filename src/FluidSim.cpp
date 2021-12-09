@@ -134,17 +134,30 @@ void FluidSim::Execute()
     CallDebugMethods(m_velocityTexture.GetFront(), 50, "Impulse");
 
 #pragma region Impulse
-    if (m_impulse)
-    {
-        m_addImpulseProgram->setUniform("position", m_impulse->Position);
-        m_addImpulseProgram->setUniform("radius", m_variables.SplatRadius);
-        m_addImpulseProgram->setUniform("forceMultiplier", m_variables.ForceMultiplier);
-        m_addImpulseProgram->setUniform("force", glm::vec4{ m_impulse->Force, 0 });
-        BindImage(m_addImpulseProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
-        BindImage(m_addImpulseProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
-        Compute(m_addImpulseProgram);
-        m_velocityTexture.SwapBuffers();
-    }
+    std::visit(Visitor{
+        [this](const Impulse &impulse)
+        {
+            m_addImpulseProgram->setUniform("position", impulse.Position);
+            m_addImpulseProgram->setUniform("radius", m_variables.SplatRadius);
+            m_addImpulseProgram->setUniform("forceMultiplier", m_variables.ForceMultiplier);
+            m_addImpulseProgram->setUniform("force", glm::vec4{ impulse.Force, 0 });
+            BindImage(m_addImpulseProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
+            BindImage(m_addImpulseProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
+            Compute(m_addImpulseProgram);
+            m_velocityTexture.SwapBuffers();
+        },
+        [this](const TwoPointImpulse &twoPointImpulse)
+        {
+            m_addTwoPointImpulseProgram->setUniform("originPoint", twoPointImpulse.Positions.first);
+            m_addTwoPointImpulseProgram->setUniform("endPoint", twoPointImpulse.Positions.second);
+            m_addTwoPointImpulseProgram->setUniform("forceMultiplier", twoPointImpulse.ForceMultiplier);
+            BindImage(m_addTwoPointImpulseProgram, "field_r", m_velocityTexture.GetFront(), 0, GL_READ_ONLY);
+            BindImage(m_addTwoPointImpulseProgram, "field_w", m_velocityTexture.GetBack(), 1, GL_WRITE_ONLY);
+            Compute(m_addTwoPointImpulseProgram);
+            m_velocityTexture.SwapBuffers();
+        },
+        [](std::monostate) {}
+    }, m_impulse);
 #pragma endregion
 
     /*
@@ -243,7 +256,7 @@ void FluidSim::Execute()
         DoInk();
     }
 
-    m_impulse.reset();
+    m_impulse.emplace<std::monostate>();
 }
 
 void FluidSim::DoInk()
@@ -262,17 +275,30 @@ void FluidSim::DoInk()
     const float beta{ 1.0f / (6.0f + alpha) };
     SolvePoissonSystem(m_inkTexture, m_inkTexture.GetFront(), alpha, beta, false);
 
-    if (m_impulse)
-    {
-        m_addImpulseProgram->setUniform("position", m_impulse->Position);
-        m_addImpulseProgram->setUniform("radius", m_inkVariables.InkVolume);
-        m_addImpulseProgram->setUniform("forceMultiplier", 1.0f);
-        m_addImpulseProgram->setUniform("force", m_inkVariables.InkColor);
-        BindImage(m_addImpulseProgram, "field_r", m_inkTexture.GetFront(), 0, GL_READ_ONLY);
-        BindImage(m_addImpulseProgram, "field_w", m_inkTexture.GetBack(), 1, GL_WRITE_ONLY);
-        Compute(m_addImpulseProgram);
-        m_inkTexture.SwapBuffers();
-    }
+    std::visit(Visitor{
+        [this](const Impulse &impulse)
+        {
+            m_addImpulseProgram->setUniform("position", impulse.Position);
+            m_addImpulseProgram->setUniform("radius", m_inkVariables.InkVolume);
+            m_addImpulseProgram->setUniform("forceMultiplier", 1.0f);
+            m_addImpulseProgram->setUniform("force", m_inkVariables.InkColor);
+            BindImage(m_addImpulseProgram, "field_r", m_inkTexture.GetFront(), 0, GL_READ_ONLY);
+            BindImage(m_addImpulseProgram, "field_w", m_inkTexture.GetBack(), 1, GL_WRITE_ONLY);
+            Compute(m_addImpulseProgram);
+            m_inkTexture.SwapBuffers();
+        },
+        [this](const TwoPointImpulse &twoPointImpulse)
+        {
+            m_addTwoPointImpulseProgram->setUniform("originPoint", twoPointImpulse.Positions.first);
+            m_addTwoPointImpulseProgram->setUniform("endPoint", twoPointImpulse.Positions.second);
+            m_addTwoPointImpulseProgram->setUniform("forceMultiplier", twoPointImpulse.ForceMultiplier);
+            BindImage(m_addTwoPointImpulseProgram, "field_r", m_inkTexture.GetFront(), 0, GL_READ_ONLY);
+            BindImage(m_addTwoPointImpulseProgram, "field_w", m_inkTexture.GetBack(), 1, GL_WRITE_ONLY);
+            Compute(m_addTwoPointImpulseProgram);
+            m_inkTexture.SwapBuffers();
+        },
+        [](std::monostate) {}
+    }, m_impulse);
 
     if (m_inkVariables.Boundaries)
     {
@@ -371,7 +397,12 @@ void FluidSim::DisplayDebugTextures()
 
 void FluidSim::AddImpulse(const Impulse &impulse)
 {
-    m_impulse.emplace(impulse);
+    m_impulse.emplace<Impulse>(impulse);
+}
+
+void FluidSim::AddTwoPointImpulse(const TwoPointImpulse &twoPointImpulse)
+{
+    m_impulse.emplace<TwoPointImpulse>(twoPointImpulse);
 }
 
 void FluidSim::keyEvent(const int key, const int scancode, const int action, const int mods)
@@ -475,8 +506,8 @@ void FluidSim::LoadShaders()
 
     static constexpr std::array<std::pair<globjects::Program *(FluidSim::*), std::string_view>, 12> ProgramList
     {{
+        {&FluidSim::m_addTwoPointImpulseProgram, "add_two_point_impulse"},
         {&FluidSim::m_addImpulseProgram, "add_impulse"},
-        {&FluidSim::m_addImpulseLineProgram, "add_impulse_line"},
         {&FluidSim::m_advectionProgram, "advection"},
         {&FluidSim::m_jacobiProgram, "jacobi"},
         {&FluidSim::m_divergenceProgram, "divergence"},
@@ -569,7 +600,7 @@ void FluidSim::DoDroplets()
         //LOG_INFO("Next drop: %.2f", next_drop);
 
         const glm::vec3 randomPositions[2]{ RandomPosition(), RandomPosition() };
-        m_impulse.emplace(Impulse{randomPositions[1], randomPositions[1] - randomPositions[0]});
+        m_impulse.emplace<Impulse>(Impulse{randomPositions[1], randomPositions[1] - randomPositions[0]});
 
         glm::vec3 force = randomPositions[1] - randomPositions[0];
         std::cout << "x: " << force.x << " y: " << force.y << " z: " << force.z << std::endl;

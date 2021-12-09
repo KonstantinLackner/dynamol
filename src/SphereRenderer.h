@@ -44,9 +44,6 @@ namespace dynamol
 		virtual void display();
 
 	private:
-		void updateCurrentInputPositionBuffer();
-
-	private:
 		std::vector<Molecule> m_molecules;
 		std::unique_ptr<globjects::VertexArray> m_vao = std::make_unique<globjects::VertexArray>();
 		std::unique_ptr<globjects::Buffer> m_elementColorsRadii = std::make_unique<globjects::Buffer>();
@@ -95,16 +92,24 @@ namespace dynamol
 		glm::ivec2 m_framebufferSize;
 		float m_resolutionScale{1.0f};
 
-		glm::vec3 m_currentInputPosition;
-		std::unique_ptr<globjects::VertexArray> m_currentInputPositionVao = std::make_unique<globjects::VertexArray>();
-		std::unique_ptr<globjects::Buffer> m_currentInputPositionIndicatorBuffer;
+		struct InputPosition
+		{
+			bool enabled;
+			glm::vec3 currentInputPosition;
+			std::unique_ptr<globjects::VertexArray> currentInputPositionVao = std::make_unique<globjects::VertexArray>();
+			std::unique_ptr<globjects::Buffer> currentInputPositionIndicatorBuffer;
+
+			void updateCurrentInputPositionBuffer();
+		};
+
+		std::array<InputPosition, 2> m_inputPositions;
 		std::int32_t m_numberOfAtomsToAdd{1};
-		glm::vec3 m_currentInputForce{1.0f, 1.0f, 1.0f};
+		float m_currentInputForce{1.0f};
 
 		enum InputMode : std::int32_t
 		{
-			IM_Atom,
-			IM_Force,
+			IM_Atom = 0,
+			IM_Force = 1,
 		};
 
 		std::int32_t m_inputMode{IM_Atom};

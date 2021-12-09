@@ -8,7 +8,7 @@ uniform image3D field_r;
 layout(rgba16_snorm) 
 uniform image3D field_w;
 
-uniform float force;
+uniform float forceMultiplier;
 
 uniform vec3 originPoint;
 uniform vec3 endPoint;
@@ -22,7 +22,7 @@ void main()
 
 	vec4 value = imageLoad(field_r, position);
 	
-	vec3 directedForce = directionNorm * force;
+	vec3 directedForce = directionNorm * forceMultiplier;
 	value += vec4(directedForce.x, directedForce.y, directedForce.z, 0);
 	
 	imageStore(field_w, position, value);

@@ -398,17 +398,20 @@ SphereRenderer::SphereRenderer(Viewer* viewer) : Renderer(viewer)
 	m_transformFeedback.reset(new TransformFeedback());
 	m_transformFeedback->setVaryings(shaderProgram("transformfeedback"), {"outCoords"}, GL_INTERLEAVED_ATTRIBS);
 
-	m_currentInputPosition = (minimumBounds + maximumBounds) / 2.0f;
 
-	m_currentInputPositionIndicatorBuffer = Buffer::create();
+	for (auto &inputPosition : m_inputPositions)
+	{
+		inputPosition.enabled = true;
+		inputPosition.currentInputPosition = (minimumBounds + maximumBounds) / 2.0f;
+		inputPosition.currentInputPositionIndicatorBuffer = Buffer::create();
+		inputPosition.currentInputPositionIndicatorBuffer->setStorage(sizeof(glm::vec3), glm::value_ptr(inputPosition.currentInputPosition), gl::GL_DYNAMIC_STORAGE_BIT);
 
-	m_currentInputPositionIndicatorBuffer->setStorage(sizeof(glm::vec3), glm::value_ptr(m_currentInputPosition), gl::GL_DYNAMIC_STORAGE_BIT);
-
-	auto vertexBindingInput = m_currentInputPositionVao->binding(0);
-	vertexBindingInput->setAttribute(0);
-	vertexBindingInput->setBuffer(m_currentInputPositionIndicatorBuffer.get(), 0, sizeof(glm::vec3));
-	vertexBindingInput->setFormat(3, GL_FLOAT);
-	m_currentInputPositionVao->enable(0);
+		auto vertexBindingInput = inputPosition.currentInputPositionVao->binding(0);
+		vertexBindingInput->setAttribute(0);
+		vertexBindingInput->setBuffer(inputPosition.currentInputPositionIndicatorBuffer.get(), 0, sizeof(glm::vec3));
+		vertexBindingInput->setFormat(3, GL_FLOAT);
+		inputPosition.currentInputPositionVao->enable(0);
+	}
 }
 
 void SphereRenderer::display()
@@ -676,22 +679,25 @@ void SphereRenderer::display()
 			}
 
 			bool changed{false};
-			const auto slider = [&changed, &minimumBounds, &maximumBounds, this](const char *const name, float glm::vec3::*axis)
+			const auto slider = [&changed, &minimumBounds, &maximumBounds, this](const char *const name, float glm::vec3::*axis, const InputMode inputMode)
 			{
-				changed |= ImGui::SliderFloat(name, &(m_currentInputPosition.*axis), minimumBounds.*axis, maximumBounds.*axis, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+				changed |= ImGui::SliderFloat(name, &(m_inputPositions[inputMode].currentInputPosition.*axis), minimumBounds.*axis, maximumBounds.*axis, "%.3f", ImGuiSliderFlags_AlwaysClamp);
 			};
 
-			slider("X", &glm::vec3::x);
-			slider("Y", &glm::vec3::y);
-			slider("Z", &glm::vec3::z);
+			slider("X", &glm::vec3::x, IM_Atom);
+			slider("Y", &glm::vec3::y, IM_Atom);
+			slider("Z", &glm::vec3::z, IM_Atom);
 
 			if (changed)
 			{
-				updateCurrentInputPositionBuffer();
+				m_inputPositions[IM_Atom].updateCurrentInputPositionBuffer();
 			}
 
 			ImGui::RadioButton("Atoms", &m_inputMode, IM_Atom);
 			ImGui::RadioButton("Force", &m_inputMode, IM_Force);
+
+			m_inputPositions[IM_Force].enabled = m_inputMode == IM_Force;
+			auto &inputPosition = m_inputPositions[m_inputMode];
 
 			switch (m_inputMode)
 			{
@@ -701,7 +707,7 @@ void SphereRenderer::display()
 				if (ImGui::Button("Add Atom"))
 				{
 					std::vector<glm::vec3> atoms;
-					atoms.resize(static_cast<std::size_t>(m_numberOfAtomsToAdd), m_currentInputPosition);
+					atoms.resize(static_cast<std::size_t>(m_numberOfAtomsToAdd), inputPosition.currentInputPosition);
 
 					for (auto &molecule : m_molecules)
 					{
@@ -712,7 +718,19 @@ void SphereRenderer::display()
 				break;
 
 			case IM_Force:
-				ImGui::SliderFloat3("Force", glm::value_ptr(m_currentInputForce), -300.0f, 300.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+				ImGui::Spacing();
+				changed = false;
+				slider("X2", &glm::vec3::x, IM_Force);
+				slider("Y2", &glm::vec3::y, IM_Force);
+				slider("Z2", &glm::vec3::z, IM_Force);
+				ImGui::Spacing();
+
+				if (changed)
+				{
+					m_inputPositions[IM_Force].updateCurrentInputPositionBuffer();
+				}
+
+				ImGui::SliderFloat("Force Multiplier", &m_currentInputForce, -1000.0f, 1000.0f);
 				ImGui::SliderInt("Number Of Frames", &m_remainingFrames, 1, 1000, "%d", ImGuiSliderFlags_AlwaysClamp);
 
 				if (m_remainingFrames == 0)
@@ -736,7 +754,7 @@ void SphereRenderer::display()
 
 			if (running)
 			{
-				viewer()->fluidSim()->AddImpulse({m_currentInputPosition - minimumBounds, m_currentInputForce * (static_cast<float>(m_remainingFrames) / m_holdForFrames)});
+				viewer()->fluidSim()->AddTwoPointImpulse({{m_inputPositions[0].currentInputPosition, m_inputPositions[1].currentInputPosition}, m_currentInputForce * (static_cast<float>(m_remainingFrames) / m_holdForFrames)});
 				running = --m_remainingFrames > 0;
 
 				if (disabled)
@@ -1297,18 +1315,26 @@ void SphereRenderer::display()
 
 	glPointSize(17.0f);
 
-	m_currentInputPositionVao->bind();
 	programCurrentInputPosition->use();
 	programCurrentInputPosition->setUniform("modelViewProjectionMatrix", modelViewProjectionMatrix);
-	m_currentInputPositionVao->drawArrays(GL_POINTS, 0, 1);
+
+	for (const auto &inputPosition : m_inputPositions)
+	{
+		if (inputPosition.enabled)
+		{
+			inputPosition.currentInputPositionVao->bind();
+			inputPosition.currentInputPositionVao->drawArrays(GL_POINTS, 0, 1);
+			inputPosition.currentInputPositionVao->unbind();
+		}
+	}
+
 	programCurrentInputPosition->release();
-	m_currentInputPositionVao->unbind();
 
 	// Restore OpenGL state
 	currentState->apply();
 }
 
-void SphereRenderer::updateCurrentInputPositionBuffer()
+void SphereRenderer::InputPosition::updateCurrentInputPositionBuffer()
 {
-	m_currentInputPositionIndicatorBuffer->setSubData(0, sizeof(glm::vec3), glm::value_ptr(m_currentInputPosition));
+	currentInputPositionIndicatorBuffer->setSubData(0, sizeof(glm::vec3), glm::value_ptr(currentInputPosition));
 }

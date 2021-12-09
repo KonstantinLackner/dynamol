@@ -75,6 +75,12 @@ namespace dynamol
             glm::vec3 Force;
         };
 
+        struct TwoPointImpulse
+        {
+            std::pair<glm::vec3, glm::vec3> Positions;
+            float ForceMultiplier;
+        };
+
     public:
         FluidSim(Renderer *renderer, const std::array<std::int32_t, 2> &windowDimensions, const std::array<std::int32_t, 3> &cubeDimensions);
         ~FluidSim();
@@ -85,6 +91,7 @@ namespace dynamol
         const CStdTexture3D &GetVelocityTexture() const;
         void DisplayDebugTextures();
         void AddImpulse(const Impulse &impulse);
+        void AddTwoPointImpulse(const TwoPointImpulse &twoPointImpulse);
 
         virtual void keyEvent(int key, int scancode, int action, int mods) override;
         virtual void display() override;
@@ -113,7 +120,7 @@ namespace dynamol
 
         globjects::Program *m_borderProgram{nullptr};
         globjects::Program *m_addImpulseProgram{nullptr};
-        globjects::Program *m_addImpulseLineProgram{nullptr};
+        globjects::Program *m_addTwoPointImpulseProgram{nullptr};
         globjects::Program *m_advectionProgram{nullptr};
         globjects::Program *m_jacobiProgram{nullptr};
         globjects::Program *m_divergenceProgram{nullptr};
@@ -139,7 +146,7 @@ namespace dynamol
         float m_dt;
         float m_gridScale;
         float m_lastTime;
-        std::optional<Impulse> m_impulse;
+        std::variant<std::monostate, Impulse, TwoPointImpulse> m_impulse;
         GLuint m_frameCounter;
         GLuint m_frameTimeSum;
         bool m_captureState;
