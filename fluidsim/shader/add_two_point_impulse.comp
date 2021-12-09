@@ -17,12 +17,23 @@ void main()
 {
 	vec3 direction = endPoint - originPoint;
 	vec3 directionNorm = normalize(direction);
+	ivec3 img_size = imageSize(field_w);
 
 	ivec3 position = ivec3(gl_GlobalInvocationID);
 
+	float distancePositionOrigin = length(position - originPoint);
+	float max = img_size.x;
+	if (max > img_size.y) {
+		max = img_size.y;
+	}
+	if (max > img_size.z) {
+		max = img_size.z;
+	}
+	float decayFactor = distancePositionOrigin/max;
+
 	vec4 value = imageLoad(field_r, position);
 	
-	vec3 directedForce = directionNorm * forceMultiplier;
+	vec3 directedForce = directionNorm * forceMultiplier * decayFactor;
 	value += vec4(directedForce.x, directedForce.y, directedForce.z, 0);
 	
 	imageStore(field_w, position, value);
