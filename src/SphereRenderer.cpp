@@ -1317,14 +1317,17 @@ void SphereRenderer::display()
 
 	programCurrentInputPosition->use();
 	programCurrentInputPosition->setUniform("modelViewProjectionMatrix", modelViewProjectionMatrix);
+	int colour = 0;
 
 	for (const auto &inputPosition : m_inputPositions)
 	{
 		if (inputPosition.enabled)
 		{
+			programCurrentInputPosition->setUniform("colour", colour);
 			inputPosition.currentInputPositionVao->bind();
 			inputPosition.currentInputPositionVao->drawArrays(GL_POINTS, 0, 1);
 			inputPosition.currentInputPositionVao->unbind();
+			colour++;
 		}
 	}
 
