@@ -730,7 +730,7 @@ void SphereRenderer::display()
 					m_inputPositions[IM_Force].updateCurrentInputPositionBuffer();
 				}
 
-				ImGui::SliderFloat("Force Multiplier", &m_currentInputForce, -1000.0f, 1000.0f);
+				ImGui::SliderFloat("Force Multiplier", &m_currentInputForce, 0.1f, 10.0f);
 				ImGui::SliderInt("Number Of Frames", &m_remainingFrames, 1, 1000, "%d", ImGuiSliderFlags_AlwaysClamp);
 
 				if (m_remainingFrames == 0)

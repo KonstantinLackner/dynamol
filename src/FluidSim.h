@@ -42,8 +42,8 @@ namespace dynamol
             float Viscosity{ 0.05f }; // { 0.05f };
             bool Boundaries{ true };
 
-            static constexpr std::size_t NumJacobiRounds{ 20 }; // 40
-            static constexpr std::size_t NumJacobiRoundsDiffusion{ 10 }; // 20
+            static constexpr std::size_t NumJacobiRounds{ 40 }; // 40
+            static constexpr std::size_t NumJacobiRoundsDiffusion{ 20 }; // 20
         };
 
         struct VelocityVariables : public Variables
