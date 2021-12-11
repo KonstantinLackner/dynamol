@@ -15,30 +15,14 @@ uniform vec3 endPoint;
 
 void main()
 {
-	vec3 direction = endPoint - originPoint;
-	vec3 directionNorm = normalize(direction);
-	ivec3 img_size = imageSize(field_w);
+	ivec3 coords = ivec3(gl_GlobalInvocationID);
+	float distanceSquared = pow(distance(vec3(coords), originPoint), 2);
+	float radiusSquared = pow(distance(endPoint, originPoint), 2);
 
-	ivec3 position = ivec3(gl_GlobalInvocationID);
+	//float decayFactor = clamp(1.0 - (distanceSquared / radiusSquared), 0.0, 1.0);
+	float decayFactor = 1.f;
+	vec3 force = normalize(endPoint - originPoint) * forceMultiplier;
 
-	float distancePositionOrigin = length(position - originPoint);
-	float max = img_size.x;
-	float min = 0;
-	if (max < img_size.y) {
-		max = img_size.y;
-	}
-	if (max < img_size.z) {
-		max = img_size.z;
-	}
-	//max = length(ivec3(0, 0, 0) - img_size);
-	max = 5;
-	//float decayFactor = (distancePositionOrigin - min)/(max - min) * (1 - 0) + 0; Obviously this can be simplified
-	float decayFactor = 1 - (distancePositionOrigin/max);
-
-	vec4 value = imageLoad(field_r, position);
-	
-	vec3 directedForce = directionNorm * forceMultiplier * decayFactor;
-	value += vec4(directedForce.x, directedForce.y, directedForce.z, 0);
-	
-	imageStore(field_w, position, value);
+	vec4 value = imageLoad(field_r, coords);
+	imageStore(field_w, coords, value + vec4(force * decayFactor, 0));
 }

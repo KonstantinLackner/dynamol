@@ -752,19 +752,19 @@ void SphereRenderer::display()
 				break;
 			}
 
-			if (running)
+			if (disabled)
 			{
-				viewer()->fluidSim()->AddTwoPointImpulse({{m_inputPositions[0].currentInputPosition, m_inputPositions[1].currentInputPosition}, m_currentInputForce * (static_cast<float>(m_remainingFrames) / m_holdForFrames)});
-				running = --m_remainingFrames > 0;
-
-				if (disabled)
-				{
-					ImGui::EndDisabled();
-				}
+				ImGui::EndDisabled();
 			}
 		}
 
 		ImGui::EndMenu();
+	}
+
+	if (running)
+	{
+		viewer()->fluidSim()->AddTwoPointImpulse({{m_inputPositions[0].currentInputPosition - minimumBounds, m_inputPositions[1].currentInputPosition - minimumBounds}, m_currentInputForce/* * (static_cast<float>(m_remainingFrames) / m_holdForFrames)*/});
+		running = --m_remainingFrames > 0;
 	}
 
 	// Scaling for sphere of influence radius based on estimated density
