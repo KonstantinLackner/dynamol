@@ -730,8 +730,8 @@ void SphereRenderer::display()
 					m_inputPositions[IM_Force].updateCurrentInputPositionBuffer();
 				}
 
-				ImGui::SliderFloat("Force Multiplier", &m_currentInputForce, 0.1f, 10.0f);
-				ImGui::SliderInt("Number Of Frames", &m_remainingFrames, 1, 1000, "%d", ImGuiSliderFlags_AlwaysClamp);
+				ImGui::SliderFloat("Force Multiplier", &m_currentInputForce, 0.1f, 5.0f);
+				ImGui::SliderInt("Number Of Frames", &m_remainingFrames, 1, 100, "%d", ImGuiSliderFlags_AlwaysClamp);
 
 				if (m_remainingFrames == 0)
 				{
@@ -763,7 +763,7 @@ void SphereRenderer::display()
 
 	if (running)
 	{
-		viewer()->fluidSim()->AddTwoPointImpulse({{m_inputPositions[0].currentInputPosition - minimumBounds, m_inputPositions[1].currentInputPosition - minimumBounds}, m_currentInputForce/* * (static_cast<float>(m_remainingFrames) / m_holdForFrames)*/});
+		viewer()->fluidSim()->AddTwoPointImpulse({{m_inputPositions[0].currentInputPosition - minimumBounds, m_inputPositions[1].currentInputPosition - minimumBounds}, m_currentInputForce * (static_cast<float>(m_remainingFrames) / m_holdForFrames)});
 		running = --m_remainingFrames > 0;
 	}
 
